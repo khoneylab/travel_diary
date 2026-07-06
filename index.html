@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>여행 다이어리</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Gowun+Dodum&family=Gowun+Batang:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="site-nav">
+    <a href="#/" class="nav-brand">🧳 여행 다이어리</a>
+    <nav class="nav-links" id="navContext"></nav>
+  </header>
+
+  <div id="app"></div>
+
+  <footer class="site-footer">
+    <p>여행 다이어리 · 나만의 유럽 여행 기록장</p>
+  </footer>
+
+  <!-- 여행지 추가/수정 모달 -->
+  <div id="destModal" class="modal-overlay hidden">
+    <div class="modal">
+      <h3 id="destModalTitle">새 여행지 추가</h3>
+      <form id="destForm">
+        <label>여행지 이름
+          <input type="text" id="f-name" placeholder="예: 파리" required>
+        </label>
+        <label>국가
+          <input type="text" id="f-country" placeholder="예: 프랑스">
+        </label>
+        <label>국기 이모지
+          <input type="text" id="f-flag" placeholder="🇫🇷" maxlength="8">
+        </label>
+        <div class="form-row">
+          <label>시작일
+            <input type="date" id="f-start">
+          </label>
+          <label>종료일
+            <input type="date" id="f-end">
+          </label>
+        </div>
+        <label>테마 색상
+          <input type="color" id="f-color" value="#c97b63">
+        </label>
+        <label>한줄 메모
+          <input type="text" id="f-memo" placeholder="이 여행지에서 하고 싶은 것">
+        </label>
+        <div class="modal-actions">
+          <button type="button" class="btn-secondary" id="destCancelBtn">취소</button>
+          <button type="submit" class="btn-primary">저장</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
