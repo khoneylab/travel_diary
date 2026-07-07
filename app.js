@@ -2,10 +2,12 @@
 const STORAGE_KEY = 'travelDiaryData_v1';
 const PACKING_TEMPLATE = ['의류', '전자기기', '세면도구/화장품', '서류/기타'];
 const BUDGET_TEMPLATE = ['교통', '숙소', '식비', '관광/액티비티', '쇼핑/기타'];
-const DEST_COLORS = ['#8e7cc3', '#7c93d6', '#a8c4e8', '#b48fd0', '#6f9fc9', '#9d84d8'];
+const DEST_COLORS = ['#cdb8ea', '#f0c2dd', '#dcc6ef', '#f5d0e3', '#c9aee0', '#f2bcd6'];
+const COLOR_PALETTE_VERSION = 2;
 
 let state = load() || seedData();
 normalizeState();
+migrateColors();
 save(true);
 
 function uid() {
@@ -44,6 +46,14 @@ function normalizeState() {
   });
 }
 
+function migrateColors() {
+  if (state.colorPaletteVersion === COLOR_PALETTE_VERSION) return;
+  state.destinations.forEach((d, i) => {
+    d.color = DEST_COLORS[i % DEST_COLORS.length];
+  });
+  state.colorPaletteVersion = COLOR_PALETTE_VERSION;
+}
+
 function currencySymbol(d) {
   return d.type === 'domestic' ? '₩' : '€';
 }
@@ -54,7 +64,7 @@ function seedData() {
     country: '프랑스',
     flag: '🇫🇷',
     type: 'intl',
-    color: '#8e7cc3',
+    color: '#cdb8ea',
     dateStart: '2026-08-10',
     dateEnd: '2026-08-13',
     memo: '에펠탑 야경, 루브르 박물관, 몽마르뜨 언덕 카페 들르기.'
@@ -95,7 +105,7 @@ function makeDestination(fields) {
     country: fields.country || '',
     flag: fields.flag || (fields.type === 'domestic' ? '🚗' : '✈️'),
     type: fields.type === 'domestic' ? 'domestic' : 'intl',
-    color: fields.color || '#8e7cc3',
+    color: fields.color || '#cdb8ea',
     dateStart: fields.dateStart || '',
     dateEnd: fields.dateEnd || '',
     memo: fields.memo || '',
