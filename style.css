@@ -565,7 +565,7 @@ h1, h2, h3, .brand, .tab-btn, .btn-primary, .btn-secondary, .day-title {
 .schedule-item {
   background: #fff;
   border-radius: 8px;
-  padding: 10px 26px 10px 32px;
+  padding: 10px 26px 10px 10px;
   margin-bottom: 8px;
   border: 1px solid var(--paper-line);
   position: relative;
@@ -581,13 +581,17 @@ h1, h2, h3, .brand, .tab-btn, .btn-primary, .btn-secondary, .day-title {
 }
 .schedule-item .row-del:hover { color: var(--danger); }
 
+.schedule-row {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+}
 .schedule-order {
-  position: absolute;
-  top: 8px;
-  left: 6px;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 3px;
+  flex-shrink: 0;
+  padding-top: 2px;
 }
 .order-btn {
   border: none;
@@ -603,8 +607,12 @@ h1, h2, h3, .brand, .tab-btn, .btn-primary, .btn-secondary, .day-title {
 }
 .order-btn:disabled { opacity: 0.25; cursor: default; }
 .order-btn:not(:disabled):hover { background: var(--accent); color: #fff; }
+
+.schedule-fields { flex: 1; min-width: 0; }
 .schedule-time-title { display: flex; gap: 8px; }
-.schedule-time-title input:first-child { max-width: 90px; }
+.schedule-time-title input { min-width: 0; }
+.schedule-time-title input:first-child { max-width: 90px; flex-shrink: 0; }
+.schedule-time-title input:last-child { flex: 1; }
 
 .add-schedule-btn, .add-day-btn {
   border: 1px dashed var(--accent);

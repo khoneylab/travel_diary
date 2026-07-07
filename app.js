@@ -494,17 +494,21 @@ function renderItinerary(d) {
     const list = d.itinerary[day.id] || [];
     const items = list.map((s, i) => `
       <div class="schedule-item">
-        <div class="schedule-order">
-          <button class="order-btn" data-move-sched="${d.id}|${day.id}|${s.id}|up" ${i === 0 ? 'disabled' : ''} title="위로">▲</button>
-          <button class="order-btn" data-move-sched="${d.id}|${day.id}|${s.id}|down" ${i === list.length - 1 ? 'disabled' : ''} title="아래로">▼</button>
-        </div>
         <button class="row-del" data-del-sched="${d.id}|${day.id}|${s.id}">✕</button>
-        <div class="schedule-time-title">
-          <input type="text" value="${escapeHtml(s.time || '')}" placeholder="09:00" data-sched="${d.id}|${day.id}|${s.id}|time">
-          <input type="text" value="${escapeHtml(s.title || '')}" placeholder="활동" data-sched="${d.id}|${day.id}|${s.id}|title">
+        <div class="schedule-row">
+          <div class="schedule-order">
+            <button class="order-btn" data-move-sched="${d.id}|${day.id}|${s.id}|up" ${i === 0 ? 'disabled' : ''} title="위로">▲</button>
+            <button class="order-btn" data-move-sched="${d.id}|${day.id}|${s.id}|down" ${i === list.length - 1 ? 'disabled' : ''} title="아래로">▼</button>
+          </div>
+          <div class="schedule-fields">
+            <div class="schedule-time-title">
+              <input type="text" value="${escapeHtml(s.time || '')}" placeholder="09:00" data-sched="${d.id}|${day.id}|${s.id}|time">
+              <input type="text" value="${escapeHtml(s.title || '')}" placeholder="활동" data-sched="${d.id}|${day.id}|${s.id}|title">
+            </div>
+            <div class="field-row" style="margin-top:6px"><input type="text" value="${escapeHtml(s.location || '')}" placeholder="장소" data-sched="${d.id}|${day.id}|${s.id}|location"></div>
+            <div class="field-row"><input type="text" value="${escapeHtml(s.memo || '')}" placeholder="메모" data-sched="${d.id}|${day.id}|${s.id}|memo"></div>
+          </div>
         </div>
-        <div class="field-row" style="margin-top:6px"><input type="text" value="${escapeHtml(s.location || '')}" placeholder="장소" data-sched="${d.id}|${day.id}|${s.id}|location"></div>
-        <div class="field-row"><input type="text" value="${escapeHtml(s.memo || '')}" placeholder="메모" data-sched="${d.id}|${day.id}|${s.id}|memo"></div>
       </div>
     `).join('');
     return `
