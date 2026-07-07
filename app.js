@@ -55,7 +55,7 @@ function migrateColors() {
 }
 
 function currencySymbol(d) {
-  return d.type === 'domestic' ? '₩' : '€';
+  return '₩';
 }
 
 function seedData() {
@@ -331,7 +331,7 @@ function renderDestSection(list, title, icon, emptyMsg, addType) {
   }).join('');
 
   const subtotal = list.reduce((s, d) => s + destSubtotal(d), 0);
-  const sym = addType === 'domestic' ? '₩' : '€';
+  const sym = '₩';
 
   return `
   <div class="section-header">
