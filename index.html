@@ -4,35 +4,69 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="robots" content="noindex, nofollow">
-<title>여행 다이어리</title>
+<title>현정이의 여행 다이어리</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Gowun+Dodum&family=Gowun+Batang:wght@400;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
+  <!-- 배경 장식: 비눗방울 & 나비 (장식용, 클릭 불가) -->
+  <div class="deco-layer" aria-hidden="true">
+    <span class="bubble b1"></span>
+    <span class="bubble b2"></span>
+    <span class="bubble b3"></span>
+    <span class="bubble b4"></span>
+    <span class="bubble b5"></span>
+    <svg class="butterfly bf1" viewBox="0 0 40 30" xmlns="http://www.w3.org/2000/svg">
+      <path d="M20 15 C10 -5 -5 5 8 15 C-5 25 10 35 20 15Z" fill="currentColor"/>
+      <path d="M20 15 C30 -5 45 5 32 15 C45 25 30 35 20 15Z" fill="currentColor"/>
+      <line x1="20" y1="8" x2="20" y2="22" stroke="currentColor" stroke-width="1.5"/>
+    </svg>
+    <svg class="butterfly bf2" viewBox="0 0 40 30" xmlns="http://www.w3.org/2000/svg">
+      <path d="M20 15 C10 -5 -5 5 8 15 C-5 25 10 35 20 15Z" fill="currentColor"/>
+      <path d="M20 15 C30 -5 45 5 32 15 C45 25 30 35 20 15Z" fill="currentColor"/>
+      <line x1="20" y1="8" x2="20" y2="22" stroke="currentColor" stroke-width="1.5"/>
+    </svg>
+  </div>
+
   <header class="site-nav">
-    <a href="#/" class="nav-brand">🧳 여행 다이어리</a>
+    <a href="#/" class="nav-brand">🧳 현정이의 여행 다이어리</a>
     <nav class="nav-links" id="navContext"></nav>
   </header>
 
   <div id="app"></div>
 
   <footer class="site-footer">
-    <p>여행 다이어리 · 나만의 유럽 여행 기록장</p>
+    <p>현정이의 여행 다이어리 · 나만의 기록장</p>
   </footer>
+
+  <!-- BGM 플레이어 (여행지에 음악이 등록되어 있을 때만 표시) -->
+  <div id="bgmPlayer" class="bgm-player hidden">
+    <button id="bgmToggle" type="button" title="재생/정지">▶</button>
+    <span id="bgmName" class="bgm-name"></span>
+    <input type="range" id="bgmVolume" min="0" max="1" step="0.05" value="0.6" title="볼륨">
+    <audio id="bgmAudio" loop></audio>
+  </div>
+
+  <!-- 저장 알림 토스트 -->
+  <div id="toast" class="toast"></div>
 
   <!-- 여행지 추가/수정 모달 -->
   <div id="destModal" class="modal-overlay hidden">
     <div class="modal">
       <h3 id="destModalTitle">새 여행지 추가</h3>
       <form id="destForm">
+        <div class="form-row-radio">
+          <label class="radio-pill"><input type="radio" name="f-type" value="intl" checked> ✈️ 해외 여행</label>
+          <label class="radio-pill"><input type="radio" name="f-type" value="domestic"> 🚗 국내 여행</label>
+        </div>
         <label>여행지 이름
           <input type="text" id="f-name" placeholder="예: 파리" required>
         </label>
-        <label>국가
+        <label>국가/지역
           <input type="text" id="f-country" placeholder="예: 프랑스">
         </label>
-        <label>국기 이모지
+        <label>대표 이모지
           <input type="text" id="f-flag" placeholder="🇫🇷" maxlength="8">
         </label>
         <div class="form-row">
@@ -44,7 +78,7 @@
           </label>
         </div>
         <label>테마 색상
-          <input type="color" id="f-color" value="#c97b63">
+          <input type="color" id="f-color" value="#8fb996">
         </label>
         <label>한줄 메모
           <input type="text" id="f-memo" placeholder="이 여행지에서 하고 싶은 것">

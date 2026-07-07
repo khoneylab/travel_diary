@@ -2,9 +2,11 @@
 const STORAGE_KEY = 'travelDiaryData_v1';
 const PACKING_TEMPLATE = ['의류', '전자기기', '세면도구/화장품', '서류/기타'];
 const BUDGET_TEMPLATE = ['교통', '숙소', '식비', '관광/액티비티', '쇼핑/기타'];
+const DEST_COLORS = ['#8fb996', '#a9c9a0', '#cbb8dc', '#f3c6cd', '#9fc9d3', '#e8d19a'];
 
 let state = load() || seedData();
-save();
+normalizeState();
+save(true);
 
 function uid() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
@@ -19,8 +21,31 @@ function load() {
   }
 }
 
-function save() {
+let toastTimer = null;
+function save(silent) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  if (!silent) showToast('💾 저장됨');
+}
+
+function showToast(msg) {
+  const toast = document.getElementById('toast');
+  if (!toast) return;
+  toast.textContent = msg;
+  toast.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => toast.classList.remove('show'), 1300);
+}
+
+function normalizeState() {
+  state.destinations.forEach(d => {
+    if (d.type !== 'domestic' && d.type !== 'intl') d.type = 'intl';
+    if (!d.journal) d.journal = {};
+    if (d.bgm === undefined) d.bgm = null;
+  });
+}
+
+function currencySymbol(d) {
+  return d.type === 'domestic' ? '₩' : '€';
 }
 
 function seedData() {
@@ -28,7 +53,8 @@ function seedData() {
     name: '파리',
     country: '프랑스',
     flag: '🇫🇷',
-    color: '#c97b63',
+    type: 'intl',
+    color: '#8fb996',
     dateStart: '2026-08-10',
     dateEnd: '2026-08-13',
     memo: '에펠탑 야경, 루브르 박물관, 몽마르뜨 언덕 카페 들르기.'
@@ -49,6 +75,10 @@ function seedData() {
     dest.outfits[dest.days[0].id] = {
       weather: '맑음 · 최고 26도', top: '린넨 셔츠', bottom: '와이드 팬츠', outer: '', shoes: '스니커즈', memo: '많이 걷는 날'
     };
+    dest.journal[dest.days[0].id] = {
+      text: '드디어 파리 도착! 에펠탑을 실제로 보니 생각보다 훨씬 웅장했다. 다리는 아팠지만 야경은 평생 못 잊을 것 같다.',
+      photos: []
+    };
   }
   dest.budget[1].items.push({ id: uid(), name: '호텔 3박', planned: 450, actual: '' });
   dest.budget[2].items.push({ id: uid(), name: '식비 (일 평균)', planned: 40, actual: '' });
@@ -63,8 +93,9 @@ function makeDestination(fields) {
     id,
     name: fields.name || '',
     country: fields.country || '',
-    flag: fields.flag || '✈️',
-    color: fields.color || '#c97b63',
+    flag: fields.flag || (fields.type === 'domestic' ? '🚗' : '✈️'),
+    type: fields.type === 'domestic' ? 'domestic' : 'intl',
+    color: fields.color || '#8fb996',
     dateStart: fields.dateStart || '',
     dateEnd: fields.dateEnd || '',
     memo: fields.memo || '',
@@ -72,7 +103,9 @@ function makeDestination(fields) {
     packing: PACKING_TEMPLATE.map(name => ({ id: uid(), name, items: [] })),
     budget: BUDGET_TEMPLATE.map(name => ({ id: uid(), name, items: [] })),
     outfits: {},
-    itinerary: {}
+    itinerary: {},
+    journal: {},
+    bgm: null
   };
 }
 
@@ -111,6 +144,122 @@ function fmtMoney(n) {
   return num.toLocaleString('ko-KR');
 }
 
+/* ===================== 파일 저장(IndexedDB) - 사진 & BGM ===================== */
+const FILE_DB_NAME = 'travelDiaryFiles';
+const FILE_STORE = 'files';
+let dbPromise = null;
+
+function openFileDB() {
+  if (!dbPromise) {
+    dbPromise = new Promise((resolve, reject) => {
+      const req = indexedDB.open(FILE_DB_NAME, 1);
+      req.onupgradeneeded = () => req.result.createObjectStore(FILE_STORE);
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    });
+  }
+  return dbPromise;
+}
+
+async function filePut(id, blob) {
+  const db = await openFileDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(FILE_STORE, 'readwrite');
+    tx.objectStore(FILE_STORE).put(blob, id);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+async function fileGet(id) {
+  const db = await openFileDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(FILE_STORE, 'readonly');
+    const req = tx.objectStore(FILE_STORE).get(id);
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+async function fileDelete(id) {
+  const db = await openFileDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(FILE_STORE, 'readwrite');
+    tx.objectStore(FILE_STORE).delete(id);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+function resizeImageFile(file, maxDim = 1100, quality = 0.82) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      let { width, height } = img;
+      if (width > maxDim || height > maxDim) {
+        if (width > height) { height = Math.round(height * maxDim / width); width = maxDim; }
+        else { width = Math.round(width * maxDim / height); height = maxDim; }
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+      canvas.toBlob(blob => {
+        URL.revokeObjectURL(url);
+        resolve(blob);
+      }, 'image/jpeg', quality);
+    };
+    img.onerror = reject;
+    img.src = url;
+  });
+}
+
+async function hydrateFileElements() {
+  const app = document.getElementById('app');
+  const els = app.querySelectorAll('[data-photo-thumb]');
+  for (const el of els) {
+    const fileId = el.dataset.photoThumb;
+    try {
+      const blob = await fileGet(fileId);
+      if (blob) el.src = URL.createObjectURL(blob);
+    } catch (e) { /* 무시 */ }
+  }
+}
+
+/* ===================== BGM 플레이어 ===================== */
+const bgmAudio = document.getElementById('bgmAudio');
+const bgmPlayerEl = document.getElementById('bgmPlayer');
+const bgmToggleBtn = document.getElementById('bgmToggle');
+const bgmNameEl = document.getElementById('bgmName');
+const bgmVolumeEl = document.getElementById('bgmVolume');
+let loadedBgmFileId = null;
+
+bgmAudio.volume = 0.6;
+bgmToggleBtn.addEventListener('click', () => {
+  if (bgmAudio.paused) { bgmAudio.play().catch(() => {}); bgmToggleBtn.textContent = '❚❚'; }
+  else { bgmAudio.pause(); bgmToggleBtn.textContent = '▶'; }
+});
+bgmVolumeEl.addEventListener('input', () => { bgmAudio.volume = Number(bgmVolumeEl.value); });
+bgmAudio.addEventListener('pause', () => { bgmToggleBtn.textContent = '▶'; });
+bgmAudio.addEventListener('play', () => { bgmToggleBtn.textContent = '❚❚'; });
+
+async function updateBgmPlayer(dest) {
+  if (dest && dest.bgm) {
+    bgmPlayerEl.classList.remove('hidden');
+    bgmNameEl.textContent = dest.bgm.name || 'BGM';
+    if (loadedBgmFileId !== dest.bgm.fileId) {
+      loadedBgmFileId = dest.bgm.fileId;
+      const blob = await fileGet(dest.bgm.fileId);
+      if (blob) bgmAudio.src = URL.createObjectURL(blob);
+    }
+  } else {
+    bgmPlayerEl.classList.add('hidden');
+    if (!bgmAudio.paused) bgmAudio.pause();
+    loadedBgmFileId = null;
+  }
+}
+
 /* ===================== 라우팅 ===================== */
 function parseHash() {
   const h = location.hash.replace(/^#\/?/, '');
@@ -140,15 +289,16 @@ function render() {
     navContext.innerHTML = '';
   }
   bindEvents();
+  hydrateFileElements();
+  updateBgmPlayer(dest);
 }
 
-function renderHome() {
-  const destCount = state.destinations.length;
-  const totalDays = state.destinations.reduce((s, d) => s + (d.days.length || 0), 0);
-  const totalBudget = state.destinations.reduce((sum, d) =>
-    sum + d.budget.reduce((s2, c) => s2 + c.items.reduce((s3, it) => s3 + (Number(it.planned) || 0), 0), 0), 0);
+function destSubtotal(d) {
+  return d.budget.reduce((s, c) => s + c.items.reduce((s2, it) => s2 + (Number(it.planned) || 0), 0), 0);
+}
 
-  const cards = state.destinations.map(d => {
+function renderDestSection(list, title, icon, emptyMsg, addType) {
+  const cards = list.map(d => {
     const packedTotal = d.packing.reduce((s, c) => s + c.items.length, 0);
     const packedDone = d.packing.reduce((s, c) => s + c.items.filter(i => i.checked).length, 0);
     const pct = packedTotal ? Math.round(packedDone / packedTotal * 100) : 0;
@@ -170,20 +320,36 @@ function renderHome() {
     </div>`;
   }).join('');
 
+  const subtotal = list.reduce((s, d) => s + destSubtotal(d), 0);
+  const sym = addType === 'domestic' ? '₩' : '€';
+
+  return `
+  <div class="section-header">
+    <h3>${icon} ${title}</h3>
+    <span class="section-sub">${list.length}곳${list.length ? ` · 예상 ${sym}${fmtMoney(subtotal)}` : ''}</span>
+  </div>
+  ${list.length ? `<div class="dest-grid">${cards}<div class="dest-card add-card" data-add-dest="${addType}">＋ ${title} 추가</div></div>`
+    : `<div class="dest-grid"><div class="section-empty">${emptyMsg}</div><div class="dest-card add-card" data-add-dest="${addType}">＋ ${title} 추가</div></div>`}
+  `;
+}
+
+function renderHome() {
+  const destCount = state.destinations.length;
+  const totalDays = state.destinations.reduce((s, d) => s + (d.days.length || 0), 0);
+  const intl = state.destinations.filter(d => d.type === 'intl');
+  const domestic = state.destinations.filter(d => d.type === 'domestic');
+
   return `
   <div class="hero">
-    <h1 class="hero-title">🧳 여행 다이어리</h1>
-    <p class="hero-sub">나만의 유럽 여행을 한 페이지씩 기록해요</p>
+    <h1 class="hero-title">🧳 현정이의 여행 다이어리</h1>
+    <p class="hero-sub">여행의 순간을 한 페이지씩 담아요</p>
     <div class="summary-bar">
       <div class="summary-chip">여행지 <b>${destCount}</b>곳</div>
       <div class="summary-chip">총 <b>${totalDays}</b>일</div>
-      <div class="summary-chip">예상 예산 총 <b>€${fmtMoney(totalBudget)}</b></div>
     </div>
   </div>
-  <div class="dest-grid">
-    ${cards}
-    <div class="dest-card add-card" data-add-dest="1">＋ 새 여행지 추가</div>
-  </div>
+  ${renderDestSection(intl, '해외 여행', '✈️', '아직 등록된 해외 여행지가 없어요.', 'intl')}
+  ${renderDestSection(domestic, '국내 여행', '🚗', '아직 등록된 국내 여행지가 없어요.', 'domestic')}
   `;
 }
 
@@ -193,6 +359,7 @@ function renderDestPage(d, tab) {
     ['packing', '준비물'],
     ['outfit', '코디'],
     ['itinerary', '일정'],
+    ['journal', '일기'],
     ['budget', '예산']
   ];
   const tabBar = tabs.map(([key, label]) =>
@@ -203,15 +370,18 @@ function renderDestPage(d, tab) {
   if (tab === 'packing') content = renderPacking(d);
   else if (tab === 'outfit') content = renderOutfit(d);
   else if (tab === 'itinerary') content = renderItinerary(d);
+  else if (tab === 'journal') content = renderJournal(d);
   else if (tab === 'budget') content = renderBudget(d);
   else content = renderOverview(d);
+
+  const typeLabel = d.type === 'domestic' ? '🚗 국내' : '✈️ 해외';
 
   return `
   <div class="page-header">
     <button class="back-btn" data-goto="">← 홈</button>
     <div class="page-title-block">
       <h2>${d.flag} ${escapeHtml(d.name || '이름없음')}</h2>
-      <div class="page-dates">${escapeHtml(d.country || '')} ${d.dateStart ? '· ' + fmtDate(d.dateStart) + ' - ' + fmtDate(d.dateEnd) : ''}</div>
+      <div class="page-dates">${typeLabel} · ${escapeHtml(d.country || '')} ${d.dateStart ? '· ' + fmtDate(d.dateStart) + ' - ' + fmtDate(d.dateEnd) : ''}</div>
     </div>
     <div class="page-actions">
       <button data-edit-dest="${d.id}" title="여행지 수정">✎</button>
@@ -227,6 +397,17 @@ function renderOverview(d) {
   const packedDone = d.packing.reduce((s, c) => s + c.items.filter(i => i.checked).length, 0);
   const scheduleCount = Object.values(d.itinerary).reduce((s, arr) => s + arr.length, 0);
   const totalBudget = d.budget.reduce((s, c) => s + c.items.reduce((s2, i) => s2 + (Number(i.planned) || 0), 0), 0);
+  const sym = currencySymbol(d);
+
+  const bgmBlock = d.bgm
+    ? `<div class="bgm-current">
+         <span>🎵</span>
+         <span class="bgm-file-name">${escapeHtml(d.bgm.name)}</span>
+         <button data-remove-bgm="${d.id}" title="BGM 삭제">✕</button>
+       </div>`
+    : `<label class="bgm-upload-label">🎵 배경음악(BGM) 추가
+         <input type="file" accept="audio/*" data-bgm-upload="${d.id}">
+       </label>`;
 
   return `
     <label style="font-size:0.85rem;color:var(--ink-soft)">여행 메모</label>
@@ -235,7 +416,12 @@ function renderOverview(d) {
       <div class="stat-box"><div class="stat-num">${d.days.length}</div><div class="stat-label">여행 일수</div></div>
       <div class="stat-box"><div class="stat-num">${packedDone}/${packedTotal}</div><div class="stat-label">준비물 체크</div></div>
       <div class="stat-box"><div class="stat-num">${scheduleCount}</div><div class="stat-label">일정 개수</div></div>
-      <div class="stat-box"><div class="stat-num">€${fmtMoney(totalBudget)}</div><div class="stat-label">예상 예산</div></div>
+      <div class="stat-box"><div class="stat-num">${sym}${fmtMoney(totalBudget)}</div><div class="stat-label">예상 예산</div></div>
+    </div>
+    <div class="bgm-section">
+      <h4>이 여행의 BGM</h4>
+      ${bgmBlock}
+      <p style="font-size:0.78rem;color:var(--ink-soft);margin-top:8px">등록하면 화면 오른쪽 아래 재생 버튼으로 들을 수 있어요.</p>
     </div>
   `;
 }
@@ -275,7 +461,7 @@ function renderPacking(d) {
 }
 
 function renderOutfit(d) {
-  if (!d.days.length) return renderNoDaysHint(d, '코디');
+  if (!d.days.length) return renderNoDaysHint();
   const cards = d.days.map((day, idx) => {
     const o = d.outfits[day.id] || {};
     return `
@@ -293,7 +479,7 @@ function renderOutfit(d) {
 }
 
 function renderItinerary(d) {
-  if (!d.days.length) return renderNoDaysHint(d, '일정');
+  if (!d.days.length) return renderNoDaysHint();
   const cards = d.days.map((day, idx) => {
     const list = d.itinerary[day.id] || [];
     const items = list.map(s => `
@@ -317,12 +503,38 @@ function renderItinerary(d) {
   return `<div class="day-grid">${cards}</div>`;
 }
 
-function renderNoDaysHint(d) {
+function renderJournal(d) {
+  if (!d.days.length) return renderNoDaysHint();
+  const cards = d.days.map((day, idx) => {
+    const j = d.journal[day.id] || { text: '', photos: [] };
+    const photos = (j.photos || []).map(p => `
+      <div class="photo-thumb">
+        <img data-photo-thumb="${p.id}" alt="사진">
+        <button class="photo-del" data-del-photo="${d.id}|${day.id}|${p.id}">✕</button>
+      </div>
+    `).join('');
+    return `
+    <div class="day-card journal-day">
+      <div class="day-title"><span>Day ${idx + 1}</span><span class="day-date">${fmtDate(day.date)}</span></div>
+      <textarea class="memo-box journal-textarea" data-journal="${d.id}|${day.id}" placeholder="오늘 있었던 일, 느낀 점을 자유롭게 적어보세요...">${escapeHtml(j.text || '')}</textarea>
+      <div class="photo-grid">
+        ${photos}
+        <label class="photo-add-tile" title="사진 추가">📷
+          <input type="file" accept="image/*" multiple data-add-photo="${d.id}|${day.id}">
+        </label>
+      </div>
+    </div>`;
+  }).join('');
+  return `<div class="day-grid">${cards}</div>`;
+}
+
+function renderNoDaysHint() {
   return `<p class="empty-hint">여행지의 시작일 · 종료일을 설정하면 Day별로 자동으로 나뉘어요.<br>상단 ✎ 버튼으로 날짜를 입력해보세요.</p>`;
 }
 
 function renderBudget(d) {
   let plannedTotal = 0, actualTotal = 0;
+  const sym = currencySymbol(d);
   const rows = d.budget.map(cat => {
     const itemRows = cat.items.map(it => {
       plannedTotal += Number(it.planned) || 0;
@@ -353,12 +565,12 @@ function renderBudget(d) {
 
   return `
     <div class="budget-summary">
-      <div class="stat-box total"><div class="stat-num">€${fmtMoney(plannedTotal)}</div><div class="stat-label">예상 총액</div></div>
-      <div class="stat-box"><div class="stat-num">€${fmtMoney(actualTotal)}</div><div class="stat-label">실제 지출</div></div>
-      <div class="stat-box"><div class="stat-num">€${fmtMoney(plannedTotal - actualTotal)}</div><div class="stat-label">차액</div></div>
+      <div class="stat-box total"><div class="stat-num">${sym}${fmtMoney(plannedTotal)}</div><div class="stat-label">예상 총액</div></div>
+      <div class="stat-box"><div class="stat-num">${sym}${fmtMoney(actualTotal)}</div><div class="stat-label">실제 지출</div></div>
+      <div class="stat-box"><div class="stat-num">${sym}${fmtMoney(plannedTotal - actualTotal)}</div><div class="stat-label">차액</div></div>
     </div>
     <table class="budget-table">
-      <thead><tr><th></th><th>항목</th><th>예상 (€)</th><th>실제 (€)</th><th></th></tr></thead>
+      <thead><tr><th></th><th>항목</th><th>예상 (${sym})</th><th>실제 (${sym})</th><th></th></tr></thead>
       <tbody>${rows}</tbody>
     </table>
   `;
@@ -384,7 +596,7 @@ function bindEvents() {
   });
 
   app.querySelectorAll('[data-add-dest]').forEach(el => {
-    el.addEventListener('click', () => openDestModal(null));
+    el.addEventListener('click', () => openDestModal(null, el.dataset.addDest));
   });
   app.querySelectorAll('[data-edit-dest]').forEach(el => {
     el.addEventListener('click', (e) => { e.stopPropagation(); openDestModal(el.dataset.editDest); });
@@ -405,6 +617,27 @@ function bindEvents() {
     el.addEventListener('input', () => {
       findDest(el.dataset.memo).memo = el.value;
       save();
+    });
+  });
+
+  // BGM
+  app.querySelectorAll('[data-bgm-upload]').forEach(el => {
+    el.addEventListener('change', async () => {
+      const dId = el.dataset.bgmUpload;
+      const file = el.files[0];
+      if (!file) return;
+      const fileId = uid();
+      await filePut(fileId, file);
+      findDest(dId).bgm = { fileId, name: file.name };
+      save(); render();
+    });
+  });
+  app.querySelectorAll('[data-remove-bgm]').forEach(el => {
+    el.addEventListener('click', async () => {
+      const dId = el.dataset.removeBgm;
+      const dest = findDest(dId);
+      if (dest.bgm) { await fileDelete(dest.bgm.fileId); dest.bgm = null; }
+      save(); render();
     });
   });
 
@@ -487,6 +720,45 @@ function bindEvents() {
     });
   });
 
+  // 일기
+  app.querySelectorAll('[data-journal]').forEach(el => {
+    el.addEventListener('input', () => {
+      const [dId, dayId] = el.dataset.journal.split('|');
+      const dest = findDest(dId);
+      if (!dest.journal[dayId]) dest.journal[dayId] = { text: '', photos: [] };
+      dest.journal[dayId].text = el.value;
+      save();
+    });
+  });
+  app.querySelectorAll('[data-add-photo]').forEach(el => {
+    el.addEventListener('change', async () => {
+      const [dId, dayId] = el.dataset.addPhoto.split('|');
+      const files = Array.from(el.files || []);
+      if (!files.length) return;
+      const dest = findDest(dId);
+      if (!dest.journal[dayId]) dest.journal[dayId] = { text: '', photos: [] };
+      for (const file of files) {
+        const blob = await resizeImageFile(file);
+        const fileId = uid();
+        await filePut(fileId, blob);
+        dest.journal[dayId].photos.push({ id: fileId, name: file.name });
+      }
+      save(); render();
+    });
+  });
+  app.querySelectorAll('[data-del-photo]').forEach(el => {
+    el.addEventListener('click', async () => {
+      const [dId, dayId, pId] = el.dataset.delPhoto.split('|');
+      const dest = findDest(dId);
+      const j = dest.journal[dayId];
+      if (j) {
+        await fileDelete(pId);
+        j.photos = j.photos.filter(p => p.id !== pId);
+      }
+      save(); render();
+    });
+  });
+
   // 예산
   app.querySelectorAll('[data-add-budget]').forEach(el => {
     el.addEventListener('submit', (e) => {
@@ -512,9 +784,8 @@ function bindEvents() {
       const [dId, cId, iId, field] = el.dataset.budget.split('|');
       const it = findDest(dId).budget.find(c => c.id === cId).items.find(i => i.id === iId);
       it[field] = el.value;
-      if (field === 'planned' || field === 'actual') render(); else save();
-      if (field !== 'planned' && field !== 'actual') return;
       save();
+      if (field === 'planned' || field === 'actual') render();
     });
   });
 }
@@ -523,17 +794,21 @@ function bindEvents() {
 const destModal = document.getElementById('destModal');
 const destForm = document.getElementById('destForm');
 let editingId = null;
+let nextNewColor = DEST_COLORS[0];
 
-function openDestModal(id) {
+function openDestModal(id, presetType) {
   editingId = id;
   const d = id ? findDest(id) : null;
   document.getElementById('destModalTitle').textContent = d ? '여행지 수정' : '새 여행지 추가';
   document.getElementById('f-name').value = d ? d.name : '';
   document.getElementById('f-country').value = d ? d.country : '';
-  document.getElementById('f-flag').value = d ? d.flag : '✈️';
+  const type = d ? d.type : (presetType === 'domestic' ? 'domestic' : 'intl');
+  document.querySelector(`input[name="f-type"][value="${type}"]`).checked = true;
+  document.getElementById('f-flag').value = d ? d.flag : (type === 'domestic' ? '🚗' : '✈️');
   document.getElementById('f-start').value = d ? d.dateStart : '';
   document.getElementById('f-end').value = d ? d.dateEnd : '';
-  document.getElementById('f-color').value = d ? d.color : '#c97b63';
+  nextNewColor = DEST_COLORS[state.destinations.length % DEST_COLORS.length];
+  document.getElementById('f-color').value = d ? d.color : nextNewColor;
   document.getElementById('f-memo').value = d ? d.memo : '';
   destModal.classList.remove('hidden');
 }
@@ -551,12 +826,14 @@ destForm.addEventListener('submit', (e) => {
   const fields = {
     name: document.getElementById('f-name').value.trim(),
     country: document.getElementById('f-country').value.trim(),
-    flag: document.getElementById('f-flag').value.trim() || '✈️',
+    type: document.querySelector('input[name="f-type"]:checked').value,
+    flag: document.getElementById('f-flag').value.trim(),
     dateStart: document.getElementById('f-start').value,
     dateEnd: document.getElementById('f-end').value,
     color: document.getElementById('f-color').value,
     memo: document.getElementById('f-memo').value.trim()
   };
+  if (!fields.flag) fields.flag = fields.type === 'domestic' ? '🚗' : '✈️';
 
   if (editingId) {
     const d = findDest(editingId);
@@ -566,6 +843,7 @@ destForm.addEventListener('submit', (e) => {
       d.days = buildDays(fields.dateStart, fields.dateEnd);
       d.outfits = {};
       d.itinerary = {};
+      d.journal = {};
     }
   } else {
     state.destinations.push(makeDestination(fields));
