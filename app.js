@@ -492,8 +492,12 @@ function renderItinerary(d) {
   if (!d.days.length) return renderNoDaysHint();
   const cards = d.days.map((day, idx) => {
     const list = d.itinerary[day.id] || [];
-    const items = list.map(s => `
+    const items = list.map((s, i) => `
       <div class="schedule-item">
+        <div class="schedule-order">
+          <button class="order-btn" data-move-sched="${d.id}|${day.id}|${s.id}|up" ${i === 0 ? 'disabled' : ''} title="위로">▲</button>
+          <button class="order-btn" data-move-sched="${d.id}|${day.id}|${s.id}|down" ${i === list.length - 1 ? 'disabled' : ''} title="아래로">▼</button>
+        </div>
         <button class="row-del" data-del-sched="${d.id}|${day.id}|${s.id}">✕</button>
         <div class="schedule-time-title">
           <input type="text" value="${escapeHtml(s.time || '')}" placeholder="09:00" data-sched="${d.id}|${day.id}|${s.id}|time">
@@ -717,6 +721,17 @@ function bindEvents() {
       const [dId, dayId, sId] = el.dataset.delSched.split('|');
       const dest = findDest(dId);
       dest.itinerary[dayId] = (dest.itinerary[dayId] || []).filter(s => s.id !== sId);
+      save(); render();
+    });
+  });
+  app.querySelectorAll('[data-move-sched]').forEach(el => {
+    el.addEventListener('click', () => {
+      const [dId, dayId, sId, dir] = el.dataset.moveSched.split('|');
+      const list = findDest(dId).itinerary[dayId] || [];
+      const i = list.findIndex(s => s.id === sId);
+      const j = dir === 'up' ? i - 1 : i + 1;
+      if (i < 0 || j < 0 || j >= list.length) return;
+      [list[i], list[j]] = [list[j], list[i]];
       save(); render();
     });
   });

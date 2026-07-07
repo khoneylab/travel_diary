@@ -565,7 +565,7 @@ h1, h2, h3, .brand, .tab-btn, .btn-primary, .btn-secondary, .day-title {
 .schedule-item {
   background: #fff;
   border-radius: 8px;
-  padding: 10px;
+  padding: 10px 26px 10px 32px;
   margin-bottom: 8px;
   border: 1px solid var(--paper-line);
   position: relative;
@@ -580,6 +580,29 @@ h1, h2, h3, .brand, .tab-btn, .btn-primary, .btn-secondary, .day-title {
   cursor: pointer;
 }
 .schedule-item .row-del:hover { color: var(--danger); }
+
+.schedule-order {
+  position: absolute;
+  top: 8px;
+  left: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.order-btn {
+  border: none;
+  background: var(--accent-soft);
+  color: var(--accent);
+  width: 20px;
+  height: 16px;
+  font-size: 0.55rem;
+  line-height: 1;
+  border-radius: 4px;
+  cursor: pointer;
+  padding: 0;
+}
+.order-btn:disabled { opacity: 0.25; cursor: default; }
+.order-btn:not(:disabled):hover { background: var(--accent); color: #fff; }
 .schedule-time-title { display: flex; gap: 8px; }
 .schedule-time-title input:first-child { max-width: 90px; }
 
