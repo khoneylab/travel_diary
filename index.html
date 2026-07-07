@@ -10,13 +10,15 @@
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <!-- 배경 장식: 비눗방울 & 나비 (장식용, 클릭 불가) -->
+  <!-- 배경 장식: 비눗방울 & 나비 & 반짝임 (장식용, 클릭 불가) -->
   <div class="deco-layer" aria-hidden="true">
     <span class="bubble b1"></span>
     <span class="bubble b2"></span>
     <span class="bubble b3"></span>
     <span class="bubble b4"></span>
     <span class="bubble b5"></span>
+    <span class="bubble b6"></span>
+    <span class="bubble b7"></span>
     <svg class="butterfly bf1" viewBox="0 0 40 30" xmlns="http://www.w3.org/2000/svg">
       <path d="M20 15 C10 -5 -5 5 8 15 C-5 25 10 35 20 15Z" fill="currentColor"/>
       <path d="M20 15 C30 -5 45 5 32 15 C45 25 30 35 20 15Z" fill="currentColor"/>
@@ -27,6 +29,15 @@
       <path d="M20 15 C30 -5 45 5 32 15 C45 25 30 35 20 15Z" fill="currentColor"/>
       <line x1="20" y1="8" x2="20" y2="22" stroke="currentColor" stroke-width="1.5"/>
     </svg>
+    <svg class="butterfly bf3" viewBox="0 0 40 30" xmlns="http://www.w3.org/2000/svg">
+      <path d="M20 15 C10 -5 -5 5 8 15 C-5 25 10 35 20 15Z" fill="currentColor"/>
+      <path d="M20 15 C30 -5 45 5 32 15 C45 25 30 35 20 15Z" fill="currentColor"/>
+      <line x1="20" y1="8" x2="20" y2="22" stroke="currentColor" stroke-width="1.5"/>
+    </svg>
+    <span class="sparkle s1">✨</span>
+    <span class="sparkle s2">✦</span>
+    <span class="sparkle s3">✨</span>
+    <span class="sparkle s4">✦</span>
   </div>
 
   <header class="site-nav">
@@ -78,7 +89,7 @@
           </label>
         </div>
         <label>테마 색상
-          <input type="color" id="f-color" value="#8fb996">
+          <input type="color" id="f-color" value="#8e7cc3">
         </label>
         <label>한줄 메모
           <input type="text" id="f-memo" placeholder="이 여행지에서 하고 싶은 것">

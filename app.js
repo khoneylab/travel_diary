@@ -2,7 +2,7 @@
 const STORAGE_KEY = 'travelDiaryData_v1';
 const PACKING_TEMPLATE = ['의류', '전자기기', '세면도구/화장품', '서류/기타'];
 const BUDGET_TEMPLATE = ['교통', '숙소', '식비', '관광/액티비티', '쇼핑/기타'];
-const DEST_COLORS = ['#8fb996', '#a9c9a0', '#cbb8dc', '#f3c6cd', '#9fc9d3', '#e8d19a'];
+const DEST_COLORS = ['#8e7cc3', '#7c93d6', '#a8c4e8', '#b48fd0', '#6f9fc9', '#9d84d8'];
 
 let state = load() || seedData();
 normalizeState();
@@ -54,7 +54,7 @@ function seedData() {
     country: '프랑스',
     flag: '🇫🇷',
     type: 'intl',
-    color: '#8fb996',
+    color: '#8e7cc3',
     dateStart: '2026-08-10',
     dateEnd: '2026-08-13',
     memo: '에펠탑 야경, 루브르 박물관, 몽마르뜨 언덕 카페 들르기.'
@@ -95,7 +95,7 @@ function makeDestination(fields) {
     country: fields.country || '',
     flag: fields.flag || (fields.type === 'domestic' ? '🚗' : '✈️'),
     type: fields.type === 'domestic' ? 'domestic' : 'intl',
-    color: fields.color || '#8fb996',
+    color: fields.color || '#8e7cc3',
     dateStart: fields.dateStart || '',
     dateEnd: fields.dateEnd || '',
     memo: fields.memo || '',
@@ -341,8 +341,8 @@ function renderHome() {
 
   return `
   <div class="hero">
-    <h1 class="hero-title">🧳 현정이의 여행 다이어리</h1>
-    <p class="hero-sub">여행의 순간을 한 페이지씩 담아요</p>
+    <h1 class="hero-title">인생은 짧고 세상은 넓다</h1>
+    <p class="hero-sub">- 사이먼 레이븐(Simon Raven) -</p>
     <div class="summary-bar">
       <div class="summary-chip">여행지 <b>${destCount}</b>곳</div>
       <div class="summary-chip">총 <b>${totalDays}</b>일</div>
