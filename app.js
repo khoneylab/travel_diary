@@ -44,6 +44,7 @@ function normalizeState() {
     if (!d.journal) d.journal = {};
     if (d.bgm === undefined) d.bgm = null;
     if (!d.lodging) d.lodging = [];
+    if (d.mapLink === undefined) d.mapLink = '';
   });
 }
 
@@ -146,7 +147,8 @@ function makeDestination(fields) {
     itinerary: {},
     journal: {},
     lodging: [],
-    bgm: null
+    bgm: null,
+    mapLink: ''
   };
 }
 
@@ -473,6 +475,13 @@ function renderOverview(d) {
           <span class="map-card-sub">Google 지도에서 열기 · 동선 짜기 ↗</span>
         </span>
       </a>
+      <div class="map-link-row">
+        <label>공유 지도 링크</label>
+        <div class="map-link-input-row">
+          <input type="url" placeholder="https://maps.app.goo.gl/..." value="${escapeHtml(d.mapLink || '')}" data-maplink="${d.id}">
+          ${d.mapLink ? `<a href="${escapeHtml(d.mapLink)}" target="_blank" rel="noopener" title="열기">↗</a>` : ''}
+        </div>
+      </div>
     </div>` : ''}
     <div class="bgm-section">
       <h4>이 여행의 BGM</h4>
@@ -719,6 +728,12 @@ function bindEvents() {
     el.addEventListener('input', () => {
       findDest(el.dataset.memo).memo = el.value;
       save();
+    });
+  });
+  app.querySelectorAll('[data-maplink]').forEach(el => {
+    el.addEventListener('change', () => {
+      findDest(el.dataset.maplink).mapLink = el.value.trim();
+      save(); render();
     });
   });
 

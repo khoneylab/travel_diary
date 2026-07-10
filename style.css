@@ -440,6 +440,27 @@ h1, h2, h3, .brand, .tab-btn, .btn-primary, .btn-secondary, .day-title {
 .map-card-title { font-family: 'Gowun Dodum', sans-serif; color: var(--ink); font-size: 1rem; }
 .map-card-sub { font-size: 0.78rem; color: var(--ink-soft); }
 
+.map-link-row { margin-top: 12px; }
+.map-link-row label { display: block; font-size: 0.78rem; color: var(--ink-soft); margin-bottom: 4px; }
+.map-link-input-row { display: flex; gap: 8px; align-items: center; }
+.map-link-input-row input {
+  flex: 1;
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--paper-line);
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 0.85rem;
+  background: #fff;
+}
+.map-link-input-row a {
+  flex-shrink: 0;
+  text-decoration: none;
+  color: var(--accent);
+  font-size: 1.1rem;
+}
+.map-link-input-row a:hover { color: var(--accent2); }
+
 .route-link {
   display: block;
   font-size: 0.78rem;
