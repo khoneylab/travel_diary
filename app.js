@@ -43,7 +43,33 @@ function normalizeState() {
     if (d.type !== 'domestic' && d.type !== 'intl') d.type = 'intl';
     if (!d.journal) d.journal = {};
     if (d.bgm === undefined) d.bgm = null;
+    if (!d.lodging) d.lodging = [];
   });
+}
+
+/* ===================== 구글 지도 (API 키 불필요) ===================== */
+function mapSearchUrl(query) {
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
+}
+
+function dayRouteUrl(list) {
+  const locs = (list || []).map(s => (s.location || '').trim()).filter(Boolean);
+  if (!locs.length) return null;
+  if (locs.length === 1) return mapSearchUrl(locs[0]);
+  const origin = locs[0];
+  const destination = locs[locs.length - 1];
+  const waypoints = locs.slice(1, -1);
+  let url = `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(origin)}&destination=${encodeURIComponent(destination)}`;
+  if (waypoints.length) url += `&waypoints=${waypoints.map(encodeURIComponent).join('|')}`;
+  return url;
+}
+
+function nightsBetween(start, end) {
+  if (!start || !end) return null;
+  const s = new Date(start + 'T00:00:00');
+  const e = new Date(end + 'T00:00:00');
+  if (isNaN(s) || isNaN(e) || e < s) return null;
+  return Math.round((e - s) / 86400000);
 }
 
 function migrateColors() {
@@ -77,6 +103,10 @@ function seedData() {
     { id: uid(), name: '보조배터리', checked: true },
     { id: uid(), name: 'EU 어댑터', checked: false }
   );
+  dest.lodging.push({
+    id: uid(), name: '호텔 르 파리지앵', checkIn: '2026-08-10', checkOut: '2026-08-13',
+    address: '12 Rue de Rivoli, Paris', memo: '예약번호 RSV-2284, 조식 포함'
+  });
   if (dest.days[0]) {
     dest.itinerary[dest.days[0].id] = [
       { id: uid(), time: '09:00', title: '에펠탑 전망대', location: '샹 드 마르스', memo: '예약 티켓 지참' },
@@ -115,6 +145,7 @@ function makeDestination(fields) {
     outfits: {},
     itinerary: {},
     journal: {},
+    lodging: [],
     bgm: null
   };
 }
@@ -367,6 +398,7 @@ function renderDestPage(d, tab) {
   const tabs = [
     ['overview', '개요'],
     ['packing', '준비물'],
+    ['lodging', '숙소'],
     ['outfit', '코디'],
     ['itinerary', '일정'],
     ['journal', '일기'],
@@ -378,6 +410,7 @@ function renderDestPage(d, tab) {
 
   let content = '';
   if (tab === 'packing') content = renderPacking(d);
+  else if (tab === 'lodging') content = renderLodging(d);
   else if (tab === 'outfit') content = renderOutfit(d);
   else if (tab === 'itinerary') content = renderItinerary(d);
   else if (tab === 'journal') content = renderJournal(d);
@@ -419,6 +452,8 @@ function renderOverview(d) {
          <input type="file" accept="audio/*" data-bgm-upload="${d.id}">
        </label>`;
 
+  const mapQuery = `${d.name} ${d.country}`.trim();
+
   return `
     <label style="font-size:0.85rem;color:var(--ink-soft)">여행 메모</label>
     <textarea class="memo-box" data-memo="${d.id}" placeholder="이 여행지에서 하고 싶은 것, 꼭 가봐야 할 곳을 적어보세요...">${escapeHtml(d.memo || '')}</textarea>
@@ -428,6 +463,17 @@ function renderOverview(d) {
       <div class="stat-box"><div class="stat-num">${scheduleCount}</div><div class="stat-label">일정 개수</div></div>
       <div class="stat-box"><div class="stat-num">${sym}${fmtMoney(totalBudget)}</div><div class="stat-label">예상 예산</div></div>
     </div>
+    ${mapQuery ? `
+    <div class="map-section">
+      <h4>🗺️ 지도</h4>
+      <a class="map-card" href="${mapSearchUrl(mapQuery)}" target="_blank" rel="noopener">
+        <span class="map-card-icon">📍</span>
+        <span class="map-card-text">
+          <span class="map-card-title">${escapeHtml(mapQuery)}</span>
+          <span class="map-card-sub">Google 지도에서 열기 · 동선 짜기 ↗</span>
+        </span>
+      </a>
+    </div>` : ''}
     <div class="bgm-section">
       <h4>이 여행의 BGM</h4>
       ${bgmBlock}
@@ -466,6 +512,42 @@ function renderPacking(d) {
     <form class="add-category-row" data-add-category="${d.id}">
       <input type="text" placeholder="새 카테고리 (예: 의약품)" required>
       <button type="submit">＋ 카테고리 추가</button>
+    </form>
+  `;
+}
+
+function renderLodging(d) {
+  const sorted = [...d.lodging].sort((a, b) => (a.checkIn || '9999').localeCompare(b.checkIn || '9999'));
+  const cards = sorted.map(l => {
+    const nights = nightsBetween(l.checkIn, l.checkOut);
+    return `
+    <div class="lodging-card">
+      <button class="row-del" data-del-lodging="${d.id}|${l.id}">✕</button>
+      <div class="lodging-head">
+        <span class="lodging-icon">🏨</span>
+        <input type="text" class="lodging-name" value="${escapeHtml(l.name)}" placeholder="숙소 이름" data-lodging="${d.id}|${l.id}|name">
+        ${nights !== null ? `<span class="lodging-nights">${nights}박</span>` : ''}
+      </div>
+      <div class="form-row">
+        <div class="field-row"><label>체크인</label><input type="date" value="${l.checkIn || ''}" data-lodging="${d.id}|${l.id}|checkIn"></div>
+        <div class="field-row"><label>체크아웃</label><input type="date" value="${l.checkOut || ''}" data-lodging="${d.id}|${l.id}|checkOut"></div>
+      </div>
+      <div class="field-row">
+        <label>주소</label>
+        <div class="lodging-address-row">
+          <input type="text" value="${escapeHtml(l.address || '')}" placeholder="숙소 주소" data-lodging="${d.id}|${l.id}|address">
+          ${l.address ? `<a href="${mapSearchUrl(l.address)}" target="_blank" rel="noopener" title="지도에서 보기">🗺️</a>` : ''}
+        </div>
+      </div>
+      <div class="field-row"><label>메모</label><textarea placeholder="예약번호, 특이사항 등" data-lodging="${d.id}|${l.id}|memo">${escapeHtml(l.memo || '')}</textarea></div>
+    </div>`;
+  }).join('') || '<p class="empty-hint">아직 등록된 숙소가 없어요</p>';
+
+  return `
+    <div class="lodging-list">${cards}</div>
+    <form class="add-category-row" data-add-lodging="${d.id}" style="margin-top:16px">
+      <input type="text" placeholder="새 숙소 이름 (예: 호텔 르 파리지앵)" required>
+      <button type="submit">＋ 숙소 추가</button>
     </form>
   `;
 }
@@ -511,9 +593,11 @@ function renderItinerary(d) {
         </div>
       </div>
     `).join('');
+    const routeUrl = dayRouteUrl(list);
     return `
     <div class="day-card">
       <div class="day-title"><span>Day ${idx + 1}</span><span class="day-date">${fmtDate(day.date)}</span></div>
+      ${routeUrl ? `<a class="route-link" href="${routeUrl}" target="_blank" rel="noopener">🗺️ 이 날 동선 보기 ↗</a>` : ''}
       ${items}
       <button class="add-schedule-btn" data-add-sched="${d.id}|${day.id}">＋ 일정 추가</button>
     </div>`;
@@ -696,6 +780,36 @@ function bindEvents() {
       if (!name) return;
       findDest(dId).packing.push({ id: uid(), name, items: [] });
       save(); render();
+    });
+  });
+
+  // 숙소
+  app.querySelectorAll('[data-add-lodging]').forEach(el => {
+    el.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const dId = el.dataset.addLodging;
+      const input = el.querySelector('input');
+      const name = input.value.trim();
+      if (!name) return;
+      findDest(dId).lodging.push({ id: uid(), name, checkIn: '', checkOut: '', address: '', memo: '' });
+      save(); render();
+    });
+  });
+  app.querySelectorAll('[data-del-lodging]').forEach(el => {
+    el.addEventListener('click', () => {
+      const [dId, lId] = el.dataset.delLodging.split('|');
+      const dest = findDest(dId);
+      dest.lodging = dest.lodging.filter(l => l.id !== lId);
+      save(); render();
+    });
+  });
+  app.querySelectorAll('[data-lodging]').forEach(el => {
+    el.addEventListener('input', () => {
+      const [dId, lId, field] = el.dataset.lodging.split('|');
+      const lodging = findDest(dId).lodging.find(l => l.id === lId);
+      lodging[field] = el.value;
+      save();
+      if (field === 'checkIn' || field === 'checkOut') render();
     });
   });
 

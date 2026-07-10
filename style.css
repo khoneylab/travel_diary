@@ -417,6 +417,94 @@ h1, h2, h3, .brand, .tab-btn, .btn-primary, .btn-secondary, .day-title {
 .stat-box .stat-num { font-size: 1.4rem; font-weight: bold; color: var(--accent); }
 .stat-box .stat-label { font-size: 0.8rem; color: var(--ink-soft); }
 
+.map-section {
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px dashed var(--paper-line);
+}
+.map-section h4 { margin: 0 0 10px; font-size: 1rem; }
+.map-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  text-decoration: none;
+  background: linear-gradient(135deg, var(--accent-soft), var(--accent2-soft));
+  border: 1px solid var(--paper-line);
+  border-radius: 12px;
+  padding: 16px 18px;
+  transition: transform 0.15s ease;
+}
+.map-card:hover { transform: translateY(-2px); }
+.map-card-icon { font-size: 1.8rem; }
+.map-card-text { display: flex; flex-direction: column; gap: 3px; }
+.map-card-title { font-family: 'Gowun Dodum', sans-serif; color: var(--ink); font-size: 1rem; }
+.map-card-sub { font-size: 0.78rem; color: var(--ink-soft); }
+
+.route-link {
+  display: block;
+  font-size: 0.78rem;
+  color: var(--accent);
+  text-decoration: none;
+  margin-bottom: 10px;
+  background: var(--accent-soft);
+  border-radius: 8px;
+  padding: 6px 10px;
+  text-align: center;
+}
+.route-link:hover { text-decoration: underline; }
+
+.lodging-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 18px;
+}
+.lodging-card {
+  border: 1px solid var(--paper-line);
+  border-radius: 12px;
+  padding: 16px 30px 16px 16px;
+  background: rgba(251, 253, 248, 0.8);
+  position: relative;
+}
+.lodging-card .row-del {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  border: none;
+  background: none;
+  color: var(--ink-soft);
+  cursor: pointer;
+}
+.lodging-card .row-del:hover { color: var(--danger); }
+.lodging-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.lodging-icon { font-size: 1.2rem; }
+.lodging-name {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: none;
+  font-family: 'Gowun Dodum', sans-serif;
+  font-size: 1rem;
+  font-weight: bold;
+  color: var(--ink);
+  padding: 4px 0;
+}
+.lodging-nights {
+  background: var(--accent2-soft);
+  color: var(--accent2);
+  font-size: 0.75rem;
+  border-radius: 999px;
+  padding: 3px 10px;
+  flex-shrink: 0;
+}
+.lodging-address-row { display: flex; gap: 6px; align-items: center; }
+.lodging-address-row input { flex: 1; min-width: 0; }
+.lodging-address-row a { text-decoration: none; font-size: 1rem; flex-shrink: 0; }
+
 .bgm-section {
   margin-top: 24px;
   padding-top: 20px;
