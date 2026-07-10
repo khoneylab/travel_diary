@@ -46,6 +46,7 @@ function normalizeState() {
     if (!d.lodging) d.lodging = [];
     if (d.mapLink === undefined) d.mapLink = '';
     if (d.weatherLocation === undefined) d.weatherLocation = '';
+    if (!d.links) d.links = [];
   });
 }
 
@@ -242,6 +243,7 @@ function makeDestination(fields) {
     itinerary: {},
     journal: {},
     lodging: [],
+    links: [],
     bgm: null,
     mapLink: '',
     weatherLocation: ''
@@ -498,6 +500,7 @@ function renderDestPage(d, tab) {
     ['overview', '개요'],
     ['packing', '준비물'],
     ['lodging', '숙소'],
+    ['links', '링크'],
     ['outfit', '코디'],
     ['itinerary', '일정'],
     ['journal', '일기'],
@@ -510,6 +513,7 @@ function renderDestPage(d, tab) {
   let content = '';
   if (tab === 'packing') content = renderPacking(d);
   else if (tab === 'lodging') content = renderLodging(d);
+  else if (tab === 'links') content = renderLinks(d);
   else if (tab === 'outfit') content = renderOutfit(d);
   else if (tab === 'itinerary') content = renderItinerary(d);
   else if (tab === 'journal') content = renderJournal(d);
@@ -654,6 +658,31 @@ function renderLodging(d) {
     <form class="add-category-row" data-add-lodging="${d.id}" style="margin-top:16px">
       <input type="text" placeholder="새 숙소 이름 (예: 호텔 르 파리지앵)" required>
       <button type="submit">＋ 숙소 추가</button>
+    </form>
+  `;
+}
+
+function renderLinks(d) {
+  const cards = d.links.map(l => `
+    <div class="link-card">
+      <button class="row-del" data-del-link="${d.id}|${l.id}">✕</button>
+      <div class="link-head">
+        <span class="link-icon">🔗</span>
+        <input type="text" class="link-title" value="${escapeHtml(l.title)}" placeholder="사이트 이름" data-link="${d.id}|${l.id}|title">
+      </div>
+      <div class="link-url-row">
+        <input type="url" value="${escapeHtml(l.url || '')}" placeholder="https://..." data-link="${d.id}|${l.id}|url">
+        ${l.url && isSafeHttpUrl(l.url) ? `<a href="${escapeHtml(l.url)}" target="_blank" rel="noopener" title="열기">↗</a>` : ''}
+      </div>
+    </div>
+  `).join('') || '<p class="empty-hint">아직 등록된 링크가 없어요</p>';
+
+  return `
+    <div class="lodging-list">${cards}</div>
+    <form class="add-link-form" data-add-link="${d.id}">
+      <input type="text" placeholder="사이트 이름 (예: 기차 예매 사이트)" required>
+      <input type="url" placeholder="https:// (선택, 나중에 채워도 돼요)">
+      <button type="submit">＋ 링크 추가</button>
     </form>
   `;
 }
@@ -935,6 +964,36 @@ function bindEvents() {
       lodging[field] = el.value;
       save();
       if (field === 'checkIn' || field === 'checkOut') render();
+    });
+  });
+
+  // 링크
+  app.querySelectorAll('[data-add-link]').forEach(el => {
+    el.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const dId = el.dataset.addLink;
+      const inputs = el.querySelectorAll('input');
+      const title = inputs[0].value.trim();
+      const url = inputs[1].value.trim();
+      if (!title) return;
+      findDest(dId).links.push({ id: uid(), title, url });
+      save(); render();
+    });
+  });
+  app.querySelectorAll('[data-del-link]').forEach(el => {
+    el.addEventListener('click', () => {
+      const [dId, lId] = el.dataset.delLink.split('|');
+      const dest = findDest(dId);
+      dest.links = dest.links.filter(l => l.id !== lId);
+      save(); render();
+    });
+  });
+  app.querySelectorAll('[data-link]').forEach(el => {
+    el.addEventListener('change', () => {
+      const [dId, lId, field] = el.dataset.link.split('|');
+      const link = findDest(dId).links.find(l => l.id === lId);
+      link[field] = el.value.trim();
+      save(); render();
     });
   });
 
