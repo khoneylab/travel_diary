@@ -361,8 +361,26 @@ h1, h2, h3, .brand, .tab-btn, .btn-primary, .btn-secondary, .day-title {
 .back-btn:hover { background: var(--accent-soft); }
 
 .page-title-block { flex: 1; }
-.page-title-block h2 { margin: 0; font-size: 2rem; }
+.page-title-block h2 { margin: 0; font-size: 2rem; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .page-title-block .page-dates { color: var(--ink-soft); font-size: 0.95rem; }
+
+.dday-badge {
+  display: inline-block;
+  font-size: 0.7rem;
+  font-family: 'Gowun Dodum', sans-serif;
+  font-weight: bold;
+  border-radius: 999px;
+  padding: 3px 10px;
+  vertical-align: middle;
+}
+.dest-card .dday-badge { margin-bottom: 4px; }
+.dday-upcoming { background: rgba(255,255,255,0.4); color: #fff; }
+.page-title-block .dday-upcoming { background: var(--accent-soft); color: var(--accent); font-size: 0.8rem; }
+.dday-today { background: var(--danger); color: #fff; }
+.dday-ongoing { background: var(--accent2-soft); color: var(--accent2); }
+.dest-card .dday-ongoing, .dest-card .dday-today { color: #fff; background: rgba(255,255,255,0.5); }
+.dday-past { background: rgba(255,255,255,0.3); color: #fff; }
+.page-title-block .dday-past { background: var(--paper-line); color: var(--ink-soft); }
 
 .page-actions button {
   border: none;
@@ -1095,4 +1113,62 @@ h1, h2, h3, .brand, .tab-btn, .btn-primary, .btn-secondary, .day-title {
   .hero-title { font-size: 2.1rem; }
   .diary-page { padding: 18px; }
   .bgm-player { max-width: 200px; }
+}
+
+/* ---------- 인쇄용 보기 ---------- */
+.print-toolbar {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+.print-toolbar button {
+  border: 1px solid var(--paper-line);
+  background: rgba(255,255,255,0.8);
+  border-radius: 999px;
+  padding: 8px 16px;
+  cursor: pointer;
+  font-family: 'Gowun Dodum', sans-serif;
+  font-size: 0.9rem;
+}
+.print-toolbar button:hover { background: var(--accent-soft); color: var(--accent); }
+
+.print-page {
+  background: #fff;
+  border-radius: var(--radius);
+  padding: 32px;
+  box-shadow: var(--shadow);
+  max-width: 760px;
+  margin: 0 auto;
+}
+.print-page h1 { margin: 0 0 4px; font-size: 1.7rem; }
+.print-sub { color: var(--ink-soft); margin: 0 0 14px; }
+.print-memo-block {
+  background: var(--paper);
+  border-radius: 8px;
+  padding: 12px 14px;
+  font-size: 0.9rem;
+  white-space: pre-wrap;
+}
+.print-page h2 {
+  margin-top: 30px;
+  padding-bottom: 6px;
+  border-bottom: 2px solid var(--accent-soft);
+  font-size: 1.2rem;
+}
+.print-page h3 { margin: 16px 0 6px; font-size: 1rem; color: var(--accent); }
+.print-list { margin: 0; padding-left: 4px; list-style: none; }
+.print-list li { padding: 3px 0; font-size: 0.9rem; border-bottom: 1px dotted var(--paper-line); }
+.print-memo { color: var(--ink-soft); }
+.print-empty { color: var(--ink-soft); font-size: 0.85rem; font-style: italic; }
+.print-table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 0.88rem; }
+.print-table th { text-align: left; padding: 6px 8px; border-bottom: 2px solid var(--paper-line); color: var(--ink-soft); font-size: 0.8rem; }
+.print-table td { padding: 6px 8px; border-bottom: 1px dotted var(--paper-line); }
+.print-table .print-cat { font-weight: bold; color: var(--accent); padding-top: 12px; }
+.print-table tfoot td { font-weight: bold; border-top: 2px solid var(--paper-line); border-bottom: none; }
+
+@media print {
+  .site-nav, .site-footer, .bgm-player, .toast, .deco-layer, .no-print { display: none !important; }
+  body { background: #fff !important; }
+  .print-page { box-shadow: none; padding: 0; max-width: none; }
+  #app { padding: 0; }
 }

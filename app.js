@@ -285,6 +285,18 @@ function fmtMoney(n) {
   return num.toLocaleString('ko-KR');
 }
 
+function dDayInfo(d) {
+  if (!d.dateStart) return null;
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const start = new Date(d.dateStart + 'T00:00:00');
+  const end = new Date((d.dateEnd || d.dateStart) + 'T00:00:00');
+  const diffStart = Math.round((start - today) / 86400000);
+  const diffEnd = Math.round((end - today) / 86400000);
+  if (diffStart > 0) return { label: `D-${diffStart}`, kind: 'upcoming' };
+  if (diffEnd >= 0) return { label: diffStart === 0 ? 'D-DAY' : '여행 중', kind: diffStart === 0 ? 'today' : 'ongoing' };
+  return { label: '다녀왔어요', kind: 'past' };
+}
+
 /* ===================== 파일 저장(IndexedDB) - 사진 & BGM ===================== */
 const FILE_DB_NAME = 'travelDiaryFiles';
 const FILE_STORE = 'files';
@@ -520,6 +532,7 @@ function renderDestSection(list, title, icon, emptyMsg, addType) {
     const packedTotal = d.packing.reduce((s, c) => s + c.items.length, 0);
     const packedDone = d.packing.reduce((s, c) => s + c.items.filter(i => i.checked).length, 0);
     const pct = packedTotal ? Math.round(packedDone / packedTotal * 100) : 0;
+    const dday = dDayInfo(d);
     return `
     <div class="dest-card" style="background:${d.color}" data-open-dest="${d.id}">
       <div class="card-menu">
@@ -532,6 +545,7 @@ function renderDestSection(list, title, icon, emptyMsg, addType) {
         <div class="dest-country">${escapeHtml(d.country || '')}</div>
       </div>
       <div>
+        ${dday ? `<span class="dday-badge dday-${dday.kind}">${dday.label}</span>` : ''}
         <div class="dest-dates">${d.dateStart ? fmtDate(d.dateStart) + ' - ' + fmtDate(d.dateEnd) : '날짜 미정'}</div>
         <div class="dest-progress"><div class="dest-progress-fill" style="width:${pct}%"></div></div>
       </div>
@@ -578,6 +592,7 @@ function renderHome() {
 }
 
 function renderDestPage(d, tab) {
+  if (tab === 'print') return renderPrintPage(d);
   const tabs = [
     ['overview', '개요'],
     ['packing', '준비물'],
@@ -603,20 +618,90 @@ function renderDestPage(d, tab) {
   else content = renderOverview(d);
 
   const typeLabel = d.type === 'domestic' ? '🚗 국내' : '✈️ 해외';
+  const dday = dDayInfo(d);
 
   return `
   <div class="page-header">
     <button class="back-btn" data-goto="">← 홈</button>
     <div class="page-title-block">
-      <h2>${d.flag} ${escapeHtml(d.name || '이름없음')}</h2>
+      <h2>${d.flag} ${escapeHtml(d.name || '이름없음')} ${dday ? `<span class="dday-badge dday-${dday.kind}">${dday.label}</span>` : ''}</h2>
       <div class="page-dates">${typeLabel} · ${escapeHtml(d.country || '')} ${d.dateStart ? '· ' + fmtDate(d.dateStart) + ' - ' + fmtDate(d.dateEnd) : ''}</div>
     </div>
     <div class="page-actions">
+      <button data-goto="dest/${d.id}/print" title="인쇄 / PDF로 저장">🖨️</button>
       <button data-edit-dest="${d.id}" title="여행지 수정">✎</button>
     </div>
   </div>
   <div class="tab-bar">${tabBar}</div>
   <div class="diary-page">${content}</div>
+  `;
+}
+
+function renderPrintPage(d) {
+  const sym = currencySymbol(d);
+
+  const packingHtml = d.packing.map(cat => `
+    <h3>${escapeHtml(cat.name)}</h3>
+    <ul class="print-list">
+      ${cat.items.map(it => `<li>${it.checked ? '☑' : '☐'} ${escapeHtml(it.name)}</li>`).join('') || '<li class="print-empty">-</li>'}
+    </ul>
+  `).join('');
+
+  const sortedLodging = [...d.lodging].sort((a, b) => (a.checkIn || '9999').localeCompare(b.checkIn || '9999'));
+  const lodgingHtml = sortedLodging.length ? `
+    <table class="print-table">
+      <thead><tr><th>숙소</th><th>체크인</th><th>체크아웃</th><th>주소</th></tr></thead>
+      <tbody>
+        ${sortedLodging.map(l => `<tr><td>${escapeHtml(l.name)}</td><td>${fmtDate(l.checkIn)}</td><td>${fmtDate(l.checkOut)}</td><td>${escapeHtml(l.address || '')}</td></tr>`).join('')}
+      </tbody>
+    </table>` : '<p class="print-empty">등록된 숙소가 없어요</p>';
+
+  const itineraryHtml = d.days.map((day, idx) => {
+    const list = d.itinerary[day.id] || [];
+    return `
+    <h3>Day ${idx + 1} · ${fmtDate(day.date)} <span class="day-weather" data-weather-day="${d.id}|${day.date}"></span></h3>
+    ${list.length ? `<ul class="print-list">
+      ${list.map(s => `<li><b>${escapeHtml(s.time || '--:--')}</b> ${escapeHtml(s.title || '(제목 없음)')}${s.location ? ' · 📍' + escapeHtml(s.location) : ''}${s.memo ? ` <span class="print-memo">(${escapeHtml(s.memo)})</span>` : ''}</li>`).join('')}
+    </ul>` : '<p class="print-empty">등록된 일정이 없어요</p>'}
+    `;
+  }).join('') || '<p class="print-empty">여행 날짜를 설정하면 일정이 표시돼요</p>';
+
+  let plannedTotal = 0, actualTotal = 0;
+  const budgetHtml = d.budget.map(cat => {
+    const rows = cat.items.map(it => {
+      plannedTotal += Number(it.planned) || 0;
+      actualTotal += Number(it.actual) || 0;
+      return `<tr><td>${escapeHtml(it.name)}</td><td>${sym}${fmtMoney(it.planned)}</td><td>${sym}${fmtMoney(it.actual)}</td></tr>`;
+    }).join('');
+    return rows ? `<tr><td colspan="3" class="print-cat">${escapeHtml(cat.name)}</td></tr>${rows}` : '';
+  }).join('');
+
+  return `
+  <div class="print-toolbar no-print">
+    <button data-goto="dest/${d.id}/overview">← 돌아가기</button>
+    <button data-print-trigger="1">🖨️ 인쇄 / PDF로 저장</button>
+  </div>
+  <div class="print-page">
+    <h1>${d.flag} ${escapeHtml(d.name || '이름없음')} 여행 계획</h1>
+    <p class="print-sub">${escapeHtml(d.country || '')} ${d.dateStart ? '· ' + fmtDate(d.dateStart) + ' - ' + fmtDate(d.dateEnd) : ''}</p>
+    ${d.memo ? `<p class="print-memo-block">${escapeHtml(d.memo)}</p>` : ''}
+
+    <h2>✅ 준비물</h2>
+    ${packingHtml || '<p class="print-empty">등록된 준비물이 없어요</p>'}
+
+    <h2>🏨 숙소</h2>
+    ${lodgingHtml}
+
+    <h2>🗓️ 일정</h2>
+    ${itineraryHtml}
+
+    <h2>💰 예산</h2>
+    <table class="print-table">
+      <thead><tr><th>항목</th><th>예상</th><th>실제</th></tr></thead>
+      <tbody>${budgetHtml || ''}</tbody>
+      <tfoot><tr><td>합계</td><td>${sym}${fmtMoney(plannedTotal)}</td><td>${sym}${fmtMoney(actualTotal)}</td></tr></tfoot>
+    </table>
+  </div>
   `;
 }
 
@@ -916,6 +1001,9 @@ function bindEvents() {
 
   app.querySelectorAll('[data-export-backup]').forEach(el => {
     el.addEventListener('click', () => { exportBackup(); });
+  });
+  app.querySelectorAll('[data-print-trigger]').forEach(el => {
+    el.addEventListener('click', () => { window.print(); });
   });
   app.querySelectorAll('[data-import-backup]').forEach(el => {
     el.addEventListener('change', () => {
