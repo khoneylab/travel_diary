@@ -54,6 +54,15 @@ function mapSearchUrl(query) {
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
 }
 
+function isSafeHttpUrl(url) {
+  try {
+    const u = new URL(url);
+    return u.protocol === 'http:' || u.protocol === 'https:';
+  } catch (e) {
+    return false;
+  }
+}
+
 function dayRouteUrl(list) {
   const locs = (list || []).map(s => (s.location || '').trim()).filter(Boolean);
   if (!locs.length) return null;
@@ -567,7 +576,7 @@ function renderOverview(d) {
         <label>공유 지도 링크</label>
         <div class="map-link-input-row">
           <input type="url" placeholder="https://maps.app.goo.gl/..." value="${escapeHtml(d.mapLink || '')}" data-maplink="${d.id}">
-          ${d.mapLink ? `<a href="${escapeHtml(d.mapLink)}" target="_blank" rel="noopener" title="열기">↗</a>` : ''}
+          ${d.mapLink && isSafeHttpUrl(d.mapLink) ? `<a href="${escapeHtml(d.mapLink)}" target="_blank" rel="noopener" title="열기">↗</a>` : ''}
         </div>
       </div>
     </div>` : ''}
