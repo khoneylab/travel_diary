@@ -697,11 +697,12 @@ h1, h2, h3, .brand, .tab-btn, .btn-primary, .btn-secondary, .day-title {
 .field-row textarea { resize: vertical; min-height: 40px; }
 
 .schedule-item {
-  background: #fff;
-  border-radius: 8px;
-  padding: 10px 26px 10px 10px;
-  margin-bottom: 8px;
-  border: 1px solid var(--paper-line);
+  background: linear-gradient(165deg, rgba(255,255,255,0.95), var(--accent-soft) 260%);
+  border-radius: 14px;
+  padding: 12px 28px 12px 12px;
+  margin-bottom: 10px;
+  border: 1px solid rgba(142, 124, 195, 0.16);
+  box-shadow: 0 2px 10px rgba(90, 75, 130, 0.06);
   position: relative;
 }
 .schedule-item .row-del {
@@ -743,10 +744,48 @@ h1, h2, h3, .brand, .tab-btn, .btn-primary, .btn-secondary, .day-title {
 .order-btn:not(:disabled):hover { background: var(--accent); color: #fff; }
 
 .schedule-fields { flex: 1; min-width: 0; }
-.schedule-time-title { display: flex; gap: 8px; }
-.schedule-time-title input { min-width: 0; }
-.schedule-time-title input:first-child { max-width: 90px; flex-shrink: 0; }
-.schedule-time-title input:last-child { flex: 1; }
+.schedule-time-title { display: flex; gap: 10px; align-items: center; }
+.schedule-time-title input {
+  min-width: 0;
+  border: none;
+  background: none;
+  font-family: 'Gowun Dodum', sans-serif;
+  transition: box-shadow 0.15s ease, background 0.15s ease;
+}
+.schedule-time-title input:first-child {
+  max-width: 66px;
+  flex-shrink: 0;
+  text-align: center;
+  font-weight: bold;
+  font-size: 0.82rem;
+  color: var(--accent);
+  background: var(--accent-soft);
+  border-radius: 999px;
+  padding: 7px 4px;
+}
+.schedule-time-title input:first-child:focus { outline: none; box-shadow: 0 0 0 2px var(--accent2-soft); }
+.schedule-time-title input:last-child {
+  flex: 1;
+  font-size: 1rem;
+  color: var(--ink);
+  border-bottom: 2px solid var(--accent-soft);
+  border-radius: 0;
+  padding: 6px 2px;
+}
+.schedule-time-title input:last-child:focus { outline: none; border-bottom-color: var(--accent); }
+
+.schedule-item .field-row { margin: 8px 0 0; }
+.schedule-item .field-row input {
+  border: none;
+  background: rgba(255, 255, 255, 0.65);
+  border-radius: 8px;
+  padding: 7px 10px;
+  font-size: 0.85rem;
+  color: var(--ink);
+  transition: box-shadow 0.15s ease, background 0.15s ease;
+}
+.schedule-item .field-row input::placeholder { color: var(--ink-soft); opacity: 0.8; }
+.schedule-item .field-row input:focus { outline: none; background: #fff; box-shadow: 0 0 0 2px var(--accent2-soft); }
 
 .add-schedule-btn, .add-day-btn {
   border: 1px dashed var(--accent);

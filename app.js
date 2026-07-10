@@ -699,8 +699,8 @@ function renderItinerary(d) {
               <input type="text" value="${escapeHtml(s.time || '')}" placeholder="09:00" data-sched="${d.id}|${day.id}|${s.id}|time">
               <input type="text" value="${escapeHtml(s.title || '')}" placeholder="활동" data-sched="${d.id}|${day.id}|${s.id}|title">
             </div>
-            <div class="field-row" style="margin-top:6px"><input type="text" value="${escapeHtml(s.location || '')}" placeholder="장소" data-sched="${d.id}|${day.id}|${s.id}|location"></div>
-            <div class="field-row"><input type="text" value="${escapeHtml(s.memo || '')}" placeholder="메모" data-sched="${d.id}|${day.id}|${s.id}|memo"></div>
+            <div class="field-row"><input type="text" value="${escapeHtml(s.location || '')}" placeholder="📍 장소" data-sched="${d.id}|${day.id}|${s.id}|location"></div>
+            <div class="field-row"><input type="text" value="${escapeHtml(s.memo || '')}" placeholder="📝 메모" data-sched="${d.id}|${day.id}|${s.id}|memo"></div>
           </div>
         </div>
       </div>
