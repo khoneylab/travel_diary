@@ -595,13 +595,13 @@ function renderDestPage(d, tab) {
   if (tab === 'print') return renderPrintPage(d);
   const tabs = [
     ['overview', '개요'],
-    ['packing', '준비물'],
-    ['lodging', '숙소'],
-    ['links', '링크'],
-    ['outfit', '코디'],
     ['itinerary', '일정'],
-    ['journal', '일기'],
-    ['budget', '예산']
+    ['outfit', '코디'],
+    ['lodging', '숙소'],
+    ['budget', '예산'],
+    ['packing', '준비물'],
+    ['links', '링크'],
+    ['journal', '일기']
   ];
   const tabBar = tabs.map(([key, label]) =>
     `<button class="tab-btn ${tab === key ? 'active' : ''}" data-goto="dest/${d.id}/${key}">${label}</button>`
