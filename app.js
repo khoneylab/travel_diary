@@ -368,6 +368,82 @@ async function hydrateFileElements() {
   }
 }
 
+/* ===================== 백업 내보내기 / 불러오기 ===================== */
+function blobToBase64(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+}
+
+function collectFileIds() {
+  const ids = new Set();
+  state.destinations.forEach(d => {
+    Object.values(d.journal || {}).forEach(j => (j.photos || []).forEach(p => ids.add(p.id)));
+    if (d.bgm && d.bgm.fileId) ids.add(d.bgm.fileId);
+  });
+  return Array.from(ids);
+}
+
+async function exportBackup() {
+  showToast('💾 백업 파일 만드는 중...');
+  const fileIds = collectFileIds();
+  const files = {};
+  for (const id of fileIds) {
+    try {
+      const blob = await fileGet(id);
+      if (blob) files[id] = { type: blob.type, data: await blobToBase64(blob) };
+    } catch (e) { /* 해당 파일은 건너뜀 */ }
+  }
+  const payload = { app: 'travel-diary', version: 1, exportedAt: new Date().toISOString(), state, files };
+  const blob = new Blob([JSON.stringify(payload)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `여행다이어리_백업_${toLocalISODate(new Date())}.json`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+  showToast('✅ 백업 파일이 다운로드됐어요');
+}
+
+async function importBackup(file) {
+  let payload;
+  try {
+    payload = JSON.parse(await file.text());
+  } catch (e) {
+    alert('백업 파일을 읽을 수 없어요. 올바른 JSON 파일인지 확인해주세요.');
+    return;
+  }
+  if (!payload || !payload.state || !Array.isArray(payload.state.destinations)) {
+    alert('올바른 여행 다이어리 백업 파일이 아니에요.');
+    return;
+  }
+  const count = payload.state.destinations.length;
+  if (!confirm(`백업 파일에서 여행지 ${count}곳을 불러와 현재 목록에 추가할까요?\n(기존 데이터는 지워지지 않아요)`)) return;
+
+  const files = payload.files || {};
+  for (const id in files) {
+    try {
+      const res = await fetch(files[id].data);
+      const blob = await res.blob();
+      await filePut(id, blob);
+    } catch (e) { /* 해당 파일은 건너뜀 */ }
+  }
+
+  payload.state.destinations.forEach(d => {
+    if (state.destinations.some(existing => existing.id === d.id)) d.id = uid();
+    state.destinations.push(d);
+  });
+  normalizeState();
+  save();
+  render();
+  showToast(`✅ 여행지 ${count}곳을 불러왔어요`);
+}
+
 /* ===================== BGM 플레이어 ===================== */
 const bgmAudio = document.getElementById('bgmAudio');
 const bgmPlayerEl = document.getElementById('bgmPlayer');
@@ -488,6 +564,12 @@ function renderHome() {
     <div class="summary-bar">
       <div class="summary-chip">여행지 <b>${destCount}</b>곳</div>
       <div class="summary-chip">총 <b>${totalDays}</b>일</div>
+    </div>
+    <div class="backup-row">
+      <button class="backup-btn" data-export-backup="1">⬇️ 전체 백업 다운로드</button>
+      <label class="backup-btn">⬆️ 백업 불러오기
+        <input type="file" accept="application/json" data-import-backup="1">
+      </label>
     </div>
   </div>
   ${renderDestSection(intl, '해외 여행', '✈️', '아직 등록된 해외 여행지가 없어요.', 'intl')}
@@ -830,6 +912,17 @@ function bindEvents() {
 
   app.querySelectorAll('[data-goto]').forEach(el => {
     el.addEventListener('click', () => { location.hash = '#/' + el.dataset.goto; });
+  });
+
+  app.querySelectorAll('[data-export-backup]').forEach(el => {
+    el.addEventListener('click', () => { exportBackup(); });
+  });
+  app.querySelectorAll('[data-import-backup]').forEach(el => {
+    el.addEventListener('change', () => {
+      const file = el.files[0];
+      if (file) importBackup(file);
+      el.value = '';
+    });
   });
 
   app.querySelectorAll('[data-open-dest]').forEach(el => {

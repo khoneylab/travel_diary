@@ -215,6 +215,26 @@ h1, h2, h3, .brand, .tab-btn, .btn-primary, .btn-secondary, .day-title {
 
 .summary-chip b { color: var(--accent); }
 
+.backup-row {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 14px;
+}
+.backup-btn {
+  display: inline-block;
+  background: rgba(255,255,255,0.6);
+  border: 1px dashed var(--paper-line);
+  border-radius: 999px;
+  padding: 6px 16px;
+  font-size: 0.78rem;
+  color: var(--ink-soft);
+  cursor: pointer;
+}
+.backup-btn:hover { border-color: var(--accent); color: var(--accent); }
+.backup-btn input { display: none; }
+
 .section-header {
   display: flex;
   align-items: baseline;
