@@ -45,6 +45,7 @@ function normalizeState() {
     if (d.bgm === undefined) d.bgm = null;
     if (!d.lodging) d.lodging = [];
     if (d.mapLink === undefined) d.mapLink = '';
+    if (d.weatherLocation === undefined) d.weatherLocation = '';
   });
 }
 
@@ -71,6 +72,91 @@ function nightsBetween(start, end) {
   const e = new Date(end + 'T00:00:00');
   if (isNaN(s) || isNaN(e) || e < s) return null;
   return Math.round((e - s) / 86400000);
+}
+
+/* ===================== 날씨 (Open-Meteo, API 키 불필요) =====================
+   여행지 이름 -> 위경도(geocoding) -> 그 위경도의 날짜별 예보를 가져온다.
+   여행지마다 위경도가 다르므로 캐시도 여행지별로 분리되어, 한 여행지의 날씨가
+   다른 여행지에 섞이지 않는다. */
+const geocodeCache = {};
+const weatherCache = {};
+
+const WEATHER_CODE_MAP = {
+  0: '☀️', 1: '🌤️', 2: '⛅', 3: '☁️',
+  45: '🌫️', 48: '🌫️',
+  51: '🌦️', 53: '🌦️', 55: '🌦️',
+  61: '🌧️', 63: '🌧️', 65: '🌧️', 66: '🌧️', 67: '🌧️',
+  71: '🌨️', 73: '🌨️', 75: '❄️', 77: '❄️',
+  80: '🌦️', 81: '🌦️', 82: '⛈️',
+  85: '🌨️', 86: '🌨️',
+  95: '⛈️', 96: '⛈️', 99: '⛈️'
+};
+
+async function geocodeLocation(query) {
+  if (query in geocodeCache) return geocodeCache[query];
+  try {
+    const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=1`);
+    const data = await res.json();
+    const first = data && data[0];
+    geocodeCache[query] = first ? { lat: parseFloat(first.lat), lon: parseFloat(first.lon) } : null;
+  } catch (e) {
+    geocodeCache[query] = null;
+  }
+  return geocodeCache[query];
+}
+
+async function fetchDailyWeather(lat, lon, startDate, endDate) {
+  const key = `${lat.toFixed(2)},${lon.toFixed(2)}|${startDate}|${endDate}`;
+  if (key in weatherCache) return weatherCache[key];
+  try {
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&daily=weathercode,temperature_2m_max,temperature_2m_min&timezone=auto&start_date=${startDate}&end_date=${endDate}`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('forecast fetch failed');
+    const data = await res.json();
+    weatherCache[key] = data.daily || null;
+  } catch (e) {
+    weatherCache[key] = null;
+  }
+  return weatherCache[key];
+}
+
+async function hydrateWeather() {
+  const app = document.getElementById('app');
+  const els = Array.from(app.querySelectorAll('[data-weather-day]'));
+  if (!els.length) return;
+
+  const byDest = {};
+  els.forEach(el => {
+    const [destId, date] = el.dataset.weatherDay.split('|');
+    (byDest[destId] = byDest[destId] || []).push({ el, date });
+  });
+
+  for (const destId in byDest) {
+    const dest = findDest(destId);
+    const group = byDest[destId];
+    const query = dest ? (dest.weatherLocation || `${dest.name} ${dest.country}`.trim()) : '';
+    if (!query) { group.forEach(({ el }) => { el.textContent = ''; }); continue; }
+
+    const geo = await geocodeLocation(query);
+    if (!geo) {
+      group.forEach(({ el }) => { el.innerHTML = `<span class="weather-na">위치를 찾을 수 없어요</span>`; });
+      continue;
+    }
+
+    const dates = group.map(g => g.date).sort();
+    const daily = await fetchDailyWeather(geo.lat, geo.lon, dates[0], dates[dates.length - 1]);
+    group.forEach(({ el, date }) => {
+      const idx = daily && daily.time ? daily.time.indexOf(date) : -1;
+      if (idx === -1) {
+        el.innerHTML = `<span class="weather-na">예보 범위 밖 (출발 16일 전부터 표시)</span>`;
+        return;
+      }
+      const icon = WEATHER_CODE_MAP[daily.weathercode[idx]] || '🌡️';
+      const tmax = Math.round(daily.temperature_2m_max[idx]);
+      const tmin = Math.round(daily.temperature_2m_min[idx]);
+      el.innerHTML = `${icon} ${tmax}° / ${tmin}°`;
+    });
+  }
 }
 
 function migrateColors() {
@@ -148,7 +234,8 @@ function makeDestination(fields) {
     journal: {},
     lodging: [],
     bgm: null,
-    mapLink: ''
+    mapLink: '',
+    weatherLocation: ''
   };
 }
 
@@ -333,6 +420,7 @@ function render() {
   }
   bindEvents();
   hydrateFileElements();
+  hydrateWeather();
   updateBgmPlayer(dest);
 }
 
@@ -581,6 +669,12 @@ function renderOutfit(d) {
 
 function renderItinerary(d) {
   if (!d.days.length) return renderNoDaysHint();
+  const autoQuery = `${d.name} ${d.country}`.trim();
+  const weatherLocRow = `
+    <div class="weather-loc-row">
+      <label>🌡️ 날씨 조회 위치</label>
+      <input type="text" value="${escapeHtml(d.weatherLocation || '')}" placeholder="자동: ${escapeHtml(autoQuery)} (지명이 안 맞으면 직접 입력하세요)" data-weatherloc="${d.id}">
+    </div>`;
   const cards = d.days.map((day, idx) => {
     const list = d.itinerary[day.id] || [];
     const items = list.map((s, i) => `
@@ -606,12 +700,13 @@ function renderItinerary(d) {
     return `
     <div class="day-card">
       <div class="day-title"><span>Day ${idx + 1}</span><span class="day-date">${fmtDate(day.date)}</span></div>
+      <div class="day-weather" data-weather-day="${d.id}|${day.date}">날씨 불러오는 중...</div>
       ${routeUrl ? `<a class="route-link" href="${routeUrl}" target="_blank" rel="noopener">🗺️ 이 날 동선 보기 ↗</a>` : ''}
       ${items}
       <button class="add-schedule-btn" data-add-sched="${d.id}|${day.id}">＋ 일정 추가</button>
     </div>`;
   }).join('');
-  return `<div class="day-grid">${cards}</div>`;
+  return `${weatherLocRow}<div class="day-grid">${cards}</div>`;
 }
 
 function renderJournal(d) {
@@ -733,6 +828,12 @@ function bindEvents() {
   app.querySelectorAll('[data-maplink]').forEach(el => {
     el.addEventListener('change', () => {
       findDest(el.dataset.maplink).mapLink = el.value.trim();
+      save(); render();
+    });
+  });
+  app.querySelectorAll('[data-weatherloc]').forEach(el => {
+    el.addEventListener('change', () => {
+      findDest(el.dataset.weatherloc).weatherLocation = el.value.trim();
       save(); render();
     });
   });

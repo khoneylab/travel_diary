@@ -474,6 +474,31 @@ h1, h2, h3, .brand, .tab-btn, .btn-primary, .btn-secondary, .day-title {
 }
 .route-link:hover { text-decoration: underline; }
 
+.day-weather {
+  font-size: 0.85rem;
+  color: var(--ink-soft);
+  margin-bottom: 10px;
+}
+.weather-na { font-size: 0.75rem; font-style: italic; opacity: 0.8; }
+
+.weather-loc-row {
+  margin-bottom: 18px;
+  background: rgba(255,255,255,0.5);
+  border: 1px dashed var(--paper-line);
+  border-radius: 10px;
+  padding: 10px 14px;
+}
+.weather-loc-row label { display: block; font-size: 0.78rem; color: var(--ink-soft); margin-bottom: 4px; }
+.weather-loc-row input {
+  width: 100%;
+  padding: 7px 10px;
+  border: 1px solid var(--paper-line);
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 0.85rem;
+  background: #fff;
+}
+
 .lodging-list {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
