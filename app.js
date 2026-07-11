@@ -1,9 +1,10 @@
-/* ===================== 로그인 & 클라우드 동기화 (Firebase) =====================
-   기기마다 따로였던 localStorage 데이터를, 로그인한 계정 기준으로 Firestore에
-   동기화한다. 텍스트 데이터(여행지 정보/일정/예산 등)만 동기화하고, 사진·BGM
-   같은 파일은 지금은 기기별 IndexedDB에만 남는다.
+/* ===================== 동기화 코드 & 클라우드 (Firebase) =====================
+   기기마다 따로였던 localStorage 데이터를, 사용자가 만든 "동기화 코드"를 문서 ID로
+   써서 Firestore에 저장한다. 로그인 계정 없이 코드 하나로 여러 기기를 연결한다.
+   텍스트 데이터(여행지 정보/일정/예산 등)만 동기화하고, 사진·BGM 같은 파일은
+   지금은 기기별 IndexedDB에만 남는다.
    save()가 스크립트 시작부에서 곧바로 한 번 호출되므로, save()가 참조하는
-   scheduleCloudPush/currentUser는 반드시 그보다 앞서 선언되어야 한다. */
+   scheduleCloudPush/syncCode는 반드시 그보다 앞서 선언되어야 한다. */
 const firebaseConfig = {
   apiKey: "AIzaSyBvkNOKT19yF3tAYsTJAHv1q2MdNOsXG7c",
   authDomain: "traveler-db6e4.firebaseapp.com",
@@ -13,14 +14,24 @@ const firebaseConfig = {
   appId: "1:753694849941:web:c0a86326cf27ebee53549c"
 };
 firebase.initializeApp(firebaseConfig);
-const auth = firebase.auth();
 const db = firebase.firestore();
 
-let currentUser = null;
+const SYNC_CODE_KEY = 'travelDiarySyncCode';
+let syncCode = localStorage.getItem(SYNC_CODE_KEY);
 let cloudPushTimer = null;
 
 function userDocRef() {
-  return db.collection('travelDiaries').doc(currentUser.uid);
+  return db.collection('travelDiaries').doc(syncCode);
+}
+
+function generateSyncCode() {
+  const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let code = '';
+  for (let i = 0; i < 12; i++) {
+    code += alphabet[Math.floor(Math.random() * alphabet.length)];
+    if (i % 4 === 3 && i !== 11) code += '-';
+  }
+  return code;
 }
 
 function mergeCloudState(local, cloud) {
@@ -32,7 +43,7 @@ function mergeCloudState(local, cloud) {
 }
 
 function scheduleCloudPush() {
-  if (!currentUser) return;
+  if (!syncCode) return;
   clearTimeout(cloudPushTimer);
   cloudPushTimer = setTimeout(() => {
     userDocRef().set(state).catch(err => console.error('클라우드 저장 실패', err));
@@ -50,72 +61,72 @@ async function pullAndMergeCloud() {
   await userDocRef().set(state);
 }
 
-function showApp(signedIn) {
-  document.querySelectorAll('.site-nav, #app, .site-footer').forEach(el => el.classList.toggle('hidden', !signedIn));
-  document.getElementById('authScreen').classList.toggle('hidden', signedIn);
-  document.getElementById('logoutBtn').classList.toggle('hidden', !signedIn);
+function showApp(ready) {
+  document.querySelectorAll('.site-nav, #app, .site-footer').forEach(el => el.classList.toggle('hidden', !ready));
+  document.getElementById('authScreen').classList.toggle('hidden', ready);
 }
 
-auth.onAuthStateChanged(async (user) => {
-  currentUser = user;
-  if (user) {
-    showApp(true);
-    try {
-      await user.getIdToken(true);
-      await pullAndMergeCloud();
-    } catch (e) {
-      console.error('클라우드 동기화 실패', e);
-    }
-    render();
-  } else {
-    showApp(false);
-  }
-});
-
-document.getElementById('logoutBtn').addEventListener('click', () => auth.signOut());
-
-let authMode = 'login';
-const authForm = document.getElementById('authForm');
-const authToggleBtn = document.getElementById('authToggleMode');
-const authErrorEl = document.getElementById('authError');
-const authSubmitBtn = document.getElementById('authSubmitBtn');
-
-function authErrorMessage(err) {
-  const map = {
-    'auth/invalid-email': '이메일 형식이 올바르지 않아요.',
-    'auth/user-not-found': '가입되지 않은 이메일이에요.',
-    'auth/wrong-password': '비밀번호가 틀렸어요.',
-    'auth/email-already-in-use': '이미 가입된 이메일이에요. 로그인해주세요.',
-    'auth/weak-password': '비밀번호는 6자 이상이어야 해요.',
-    'auth/invalid-credential': '이메일 또는 비밀번호가 올바르지 않아요.'
-  };
-  return map[err.code] || ('문제가 발생했어요: ' + err.message);
-}
-
-authToggleBtn.addEventListener('click', () => {
-  authMode = authMode === 'login' ? 'signup' : 'login';
-  authSubmitBtn.textContent = authMode === 'login' ? '로그인' : '계정 만들기';
-  authToggleBtn.textContent = authMode === 'login' ? '처음이신가요? 계정 만들기' : '이미 계정이 있으신가요? 로그인';
-  authErrorEl.textContent = '';
-});
-
-authForm.addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const email = document.getElementById('auth-email').value.trim();
-  const password = document.getElementById('auth-password').value;
-  authErrorEl.textContent = '';
-  authSubmitBtn.disabled = true;
+async function connectWithCode(code) {
+  syncCode = code;
+  localStorage.setItem(SYNC_CODE_KEY, syncCode);
+  showApp(true);
   try {
-    if (authMode === 'login') {
-      await auth.signInWithEmailAndPassword(email, password);
-    } else {
-      await auth.createUserWithEmailAndPassword(email, password);
-    }
-  } catch (err) {
-    authErrorEl.textContent = authErrorMessage(err);
-  } finally {
-    authSubmitBtn.disabled = false;
+    await pullAndMergeCloud();
+  } catch (e) {
+    console.error('클라우드 동기화 실패', e);
   }
+  render();
+}
+
+if (syncCode) {
+  connectWithCode(syncCode);
+} else {
+  showApp(false);
+}
+
+const codeCreatedView = document.getElementById('codeCreatedView');
+const codeChooseView = document.getElementById('codeChooseView');
+const authErrorEl = document.getElementById('authError');
+
+document.getElementById('createCodeBtn').addEventListener('click', () => {
+  const code = generateSyncCode();
+  document.getElementById('newCodeValue').textContent = code;
+  codeCreatedView.dataset.pendingCode = code;
+  codeChooseView.classList.add('hidden');
+  codeCreatedView.classList.remove('hidden');
+});
+
+document.getElementById('newCodeCopyBtn').addEventListener('click', () => {
+  navigator.clipboard.writeText(document.getElementById('newCodeValue').textContent).then(() => showToast('📋 복사했어요')).catch(() => {});
+});
+
+document.getElementById('newCodeContinueBtn').addEventListener('click', () => {
+  connectWithCode(codeCreatedView.dataset.pendingCode);
+});
+
+document.getElementById('joinCodeForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const code = document.getElementById('join-code').value.trim().toUpperCase();
+  authErrorEl.textContent = '';
+  if (code.length < 8) {
+    authErrorEl.textContent = '코드를 정확히 입력해주세요.';
+    return;
+  }
+  await connectWithCode(code);
+});
+
+const codeInfoBox = document.getElementById('codeInfoBox');
+document.getElementById('codeInfoBtn').addEventListener('click', () => {
+  document.getElementById('codeInfoValue').textContent = syncCode || '-';
+  codeInfoBox.classList.toggle('hidden');
+});
+document.getElementById('codeCopyBtn').addEventListener('click', () => {
+  navigator.clipboard.writeText(syncCode || '').then(() => showToast('📋 복사했어요')).catch(() => {});
+});
+document.getElementById('codeResetBtn').addEventListener('click', () => {
+  if (!confirm('다른 코드로 새로 시작할까요? 이 기기는 지금 코드와의 연결이 끊겨요 (클라우드에 저장된 데이터는 그대로 남아있어요).')) return;
+  localStorage.removeItem(SYNC_CODE_KEY);
+  location.reload();
 });
 
 /* ===================== 상태 & 저장 ===================== */

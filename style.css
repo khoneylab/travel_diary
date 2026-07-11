@@ -191,6 +191,55 @@ h1, h2, h3, .brand, .tab-btn, .btn-primary, .btn-secondary, .day-title {
   text-decoration: underline;
 }
 
+.sync-divider {
+  text-align: center;
+  color: var(--ink-soft);
+  font-size: 0.78rem;
+  margin: 16px 0;
+  position: relative;
+}
+.sync-divider::before, .sync-divider::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  width: 40%;
+  height: 1px;
+  background: var(--paper-line);
+}
+.sync-divider::before { left: 0; }
+.sync-divider::after { right: 0; }
+
+.code-info-label { font-size: 0.8rem; color: var(--ink-soft); margin: 0 0 8px; text-align: center; }
+.code-info-hint { font-size: 0.75rem; color: var(--ink-soft); text-align: center; margin: 10px 0 0; }
+.code-display {
+  font-family: 'Gowun Dodum', sans-serif;
+  font-size: 1.3rem;
+  font-weight: bold;
+  letter-spacing: 1px;
+  color: var(--accent);
+  background: var(--accent-soft);
+  border-radius: 10px;
+  padding: 14px;
+  text-align: center;
+  margin-bottom: 12px;
+  word-break: break-all;
+}
+
+.code-info-box {
+  position: fixed;
+  top: 56px;
+  right: 16px;
+  z-index: 35;
+  background: rgba(255,255,255,0.95);
+  backdrop-filter: blur(8px);
+  border: 1px solid var(--paper-line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 18px;
+  width: 260px;
+  max-width: calc(100vw - 32px);
+}
+
 .site-footer {
   text-align: center;
   padding: 26px 20px 40px;
