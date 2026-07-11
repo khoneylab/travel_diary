@@ -19,6 +19,7 @@ const db = firebase.firestore();
 const SYNC_CODE_KEY = 'travelDiarySyncCode';
 let syncCode = localStorage.getItem(SYNC_CODE_KEY);
 let cloudPushTimer = null;
+let cloudSyncReady = false; // 클라우드와 최초 병합이 끝나기 전에는 자동저장이 클라우드를 덮어쓰지 못하게 막는다
 
 function userDocRef() {
   return db.collection('travelDiaries').doc(syncCode);
@@ -43,7 +44,7 @@ function mergeCloudState(local, cloud) {
 }
 
 function scheduleCloudPush() {
-  if (!syncCode) return;
+  if (!syncCode || !cloudSyncReady) return;
   clearTimeout(cloudPushTimer);
   cloudPushTimer = setTimeout(() => {
     userDocRef().set(state).catch(err => console.error('클라우드 저장 실패', err));
@@ -59,6 +60,7 @@ async function pullAndMergeCloud() {
   migrateColors();
   save(true);
   await userDocRef().set(state);
+  cloudSyncReady = true;
 }
 
 function showApp(ready) {
