@@ -46,10 +46,22 @@ function mergeCloudState(local, cloud) {
 function scheduleCloudPush() {
   if (!syncCode || !cloudSyncReady) return;
   clearTimeout(cloudPushTimer);
-  cloudPushTimer = setTimeout(() => {
-    userDocRef().set(state).catch(err => console.error('클라우드 저장 실패', err));
-  }, 900);
+  cloudPushTimer = setTimeout(flushCloudPush, 900);
 }
+
+function flushCloudPush() {
+  clearTimeout(cloudPushTimer);
+  if (!syncCode || !cloudSyncReady) return;
+  userDocRef().set(state).catch(err => console.error('클라우드 저장 실패', err));
+}
+
+// 탭을 닫거나 다른 화면으로 전환할 때, 아직 대기 중인 저장(디바운스)이 있으면
+// 즉시 클라우드로 내보낸다. 그렇지 않으면 수정 직후 바로 닫을 경우 그 변경이
+// 클라우드에 반영되지 못한 채 사라질 수 있다.
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') flushCloudPush();
+});
+window.addEventListener('pagehide', flushCloudPush);
 
 async function pullAndMergeCloud() {
   const snap = await userDocRef().get();
