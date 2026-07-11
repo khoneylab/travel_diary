@@ -60,16 +60,34 @@ function scheduleCloudPush() {
   cloudPushTimer = setTimeout(flushCloudPush, 900);
 }
 
-function flushCloudPush() {
+// 클라우드 최신본을 먼저 받아 로컬과 합친 뒤에 올린다(읽기-병합-쓰기).
+// 그냥 로컬 state로 덮어쓰기만 하면, 다른 기기가 그 사이 추가한 내용을
+// 이 기기가 모르는 채로 지워버릴 수 있다.
+async function mergeAndPushToCloud() {
+  const snap = await userDocRef().get();
+  const cloudState = snap.exists ? snap.data() : null;
+  const merged = mergeCloudState(state, cloudState);
+  const changed = JSON.stringify(merged) !== JSON.stringify(state);
+  state = merged;
+  normalizeState();
+  migrateColors();
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  await userDocRef().set(state);
+  return changed;
+}
+
+async function flushCloudPush() {
   clearTimeout(cloudPushTimer);
   if (!syncCode || !cloudSyncReady) return;
   setSyncStatus('☁️ 저장 중...', 'busy');
-  userDocRef().set(state)
-    .then(() => setSyncStatus('☁️ ' + fmtClock(new Date()) + ' 저장됨', 'ok'))
-    .catch(err => {
-      console.error('클라우드 저장 실패', err);
-      setSyncStatus('⚠️ 저장 실패', 'error');
-    });
+  try {
+    const changed = await mergeAndPushToCloud();
+    setSyncStatus('☁️ ' + fmtClock(new Date()) + ' 저장됨', 'ok');
+    if (changed) render();
+  } catch (err) {
+    console.error('클라우드 저장 실패', err);
+    setSyncStatus('⚠️ 저장 실패', 'error');
+  }
 }
 
 // 탭을 닫거나 다른 화면으로 전환할 때, 아직 대기 중인 저장(디바운스)이 있으면
@@ -82,14 +100,7 @@ window.addEventListener('pagehide', flushCloudPush);
 
 async function pullAndMergeCloud() {
   setSyncStatus('☁️ 불러오는 중...', 'busy');
-  const snap = await userDocRef().get();
-  if (snap.exists) {
-    state = mergeCloudState(state, snap.data());
-  }
-  normalizeState();
-  migrateColors();
-  save(true);
-  await userDocRef().set(state);
+  await mergeAndPushToCloud();
   cloudSyncReady = true;
   setSyncStatus('☁️ ' + fmtClock(new Date()) + ' 동기화됨', 'ok');
 }
