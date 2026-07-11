@@ -70,16 +70,23 @@ async function connectWithCode(code) {
   syncCode = code;
   localStorage.setItem(SYNC_CODE_KEY, syncCode);
   showApp(true);
-  try {
-    await pullAndMergeCloud();
-  } catch (e) {
-    console.error('클라우드 동기화 실패', e);
+  const attempts = 3;
+  for (let i = 0; i < attempts; i++) {
+    try {
+      await pullAndMergeCloud();
+      break;
+    } catch (e) {
+      console.error('클라우드 동기화 실패' + (i < attempts - 1 ? ' (재시도 중...)' : ''), e);
+      if (i < attempts - 1) await new Promise(r => setTimeout(r, 1000 * (i + 1)));
+    }
   }
   render();
 }
 
 if (syncCode) {
-  connectWithCode(syncCode);
+  // 페이지 로드 직후에는 Firestore SDK의 최초 연결이 완료되기 전이라
+  // 요청이 간헐적으로 실패할 수 있어 살짝 지연 후 시작한다.
+  setTimeout(() => connectWithCode(syncCode), 400);
 } else {
   showApp(false);
 }
