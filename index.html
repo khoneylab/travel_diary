@@ -7,7 +7,7 @@
 <title>여행 다이어리</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Gowun+Dodum&family=Gowun+Batang:wght@400;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=21">
+<link rel="stylesheet" href="style.css?v=22">
 </head>
 <body>
   <!-- 배경 장식: 비눗방울 & 하트 & 반짝임 (장식용, 클릭 불가) -->
@@ -37,6 +37,7 @@
   <header class="site-nav hidden">
     <a href="#/" class="nav-brand">🧳 여행 다이어리</a>
     <nav class="nav-links" id="navContext"></nav>
+    <span id="syncStatus" class="sync-status" title="클라우드 동기화 상태">-</span>
     <button id="codeInfoBtn" class="logout-btn" type="button" title="동기화 코드 보기">🔑</button>
   </header>
 
@@ -135,6 +136,6 @@
 
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
-  <script src="app.js?v=25"></script>
+  <script src="app.js?v=26"></script>
 </body>
 </html>

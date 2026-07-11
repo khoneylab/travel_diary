@@ -148,6 +148,15 @@ h1, h2, h3, .brand, .tab-btn, .btn-primary, .btn-secondary, .day-title {
 }
 .logout-btn:hover { color: var(--danger); }
 
+.sync-status {
+  font-size: 0.72rem;
+  color: var(--ink-soft);
+  white-space: nowrap;
+}
+.sync-status.status-ok { color: var(--accent); }
+.sync-status.status-busy { color: var(--accent2); }
+.sync-status.status-error { color: var(--danger); }
+
 .auth-screen {
   position: fixed;
   inset: 0;

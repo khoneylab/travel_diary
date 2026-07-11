@@ -25,6 +25,17 @@ function userDocRef() {
   return db.collection('travelDiaries').doc(syncCode);
 }
 
+function fmtClock(d) {
+  return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+}
+
+function setSyncStatus(text, kind) {
+  const el = document.getElementById('syncStatus');
+  if (!el) return;
+  el.textContent = text;
+  el.className = 'sync-status' + (kind ? ' status-' + kind : '');
+}
+
 function generateSyncCode() {
   const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
   let code = '';
@@ -52,7 +63,13 @@ function scheduleCloudPush() {
 function flushCloudPush() {
   clearTimeout(cloudPushTimer);
   if (!syncCode || !cloudSyncReady) return;
-  userDocRef().set(state).catch(err => console.error('클라우드 저장 실패', err));
+  setSyncStatus('☁️ 저장 중...', 'busy');
+  userDocRef().set(state)
+    .then(() => setSyncStatus('☁️ ' + fmtClock(new Date()) + ' 저장됨', 'ok'))
+    .catch(err => {
+      console.error('클라우드 저장 실패', err);
+      setSyncStatus('⚠️ 저장 실패', 'error');
+    });
 }
 
 // 탭을 닫거나 다른 화면으로 전환할 때, 아직 대기 중인 저장(디바운스)이 있으면
@@ -64,6 +81,7 @@ document.addEventListener('visibilitychange', () => {
 window.addEventListener('pagehide', flushCloudPush);
 
 async function pullAndMergeCloud() {
+  setSyncStatus('☁️ 불러오는 중...', 'busy');
   const snap = await userDocRef().get();
   if (snap.exists) {
     state = mergeCloudState(state, snap.data());
@@ -73,6 +91,7 @@ async function pullAndMergeCloud() {
   save(true);
   await userDocRef().set(state);
   cloudSyncReady = true;
+  setSyncStatus('☁️ ' + fmtClock(new Date()) + ' 동기화됨', 'ok');
 }
 
 function showApp(ready) {
@@ -91,7 +110,11 @@ async function connectWithCode(code) {
       break;
     } catch (e) {
       console.error('클라우드 동기화 실패' + (i < attempts - 1 ? ' (재시도 중...)' : ''), e);
-      if (i < attempts - 1) await new Promise(r => setTimeout(r, 1000 * (i + 1)));
+      if (i < attempts - 1) {
+        await new Promise(r => setTimeout(r, 1000 * (i + 1)));
+      } else {
+        setSyncStatus('⚠️ 동기화 실패', 'error');
+      }
     }
   }
   render();
