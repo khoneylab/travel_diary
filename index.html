@@ -7,7 +7,7 @@
 <title>현정이의 여행 다이어리</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Gowun+Dodum&family=Gowun+Batang:wght@400;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=18">
+<link rel="stylesheet" href="style.css?v=19">
 </head>
 <body>
   <!-- 배경 장식: 비눗방울 & 하트 & 반짝임 (장식용, 클릭 불가) -->
@@ -34,14 +34,34 @@
     <span class="sparkle s4">✦</span>
   </div>
 
-  <header class="site-nav">
+  <header class="site-nav hidden">
     <a href="#/" class="nav-brand">🧳 현정이의 여행 다이어리</a>
     <nav class="nav-links" id="navContext"></nav>
+    <button id="logoutBtn" class="logout-btn hidden" type="button" title="로그아웃">🚪</button>
   </header>
 
-  <div id="app"></div>
+  <!-- 로그인 화면: 로그인 전에는 이 화면만 보이고 나머지는 가려짐 -->
+  <div id="authScreen" class="auth-screen hidden">
+    <div class="auth-box">
+      <h2>🧳 현정이의 여행 다이어리</h2>
+      <p class="auth-sub">로그인하면 어떤 기기에서든 같은 여행 기록을 볼 수 있어요.</p>
+      <form id="authForm">
+        <label>이메일
+          <input type="email" id="auth-email" required autocomplete="username">
+        </label>
+        <label>비밀번호
+          <input type="password" id="auth-password" required autocomplete="current-password" minlength="6">
+        </label>
+        <p id="authError" class="auth-error"></p>
+        <button type="submit" class="btn-primary" id="authSubmitBtn">로그인</button>
+      </form>
+      <button type="button" id="authToggleMode" class="auth-toggle">처음이신가요? 계정 만들기</button>
+    </div>
+  </div>
 
-  <footer class="site-footer">
+  <div id="app" class="hidden"></div>
+
+  <footer class="site-footer hidden">
     <p>현정이의 여행 다이어리 · 나만의 기록장</p>
   </footer>
 
@@ -96,6 +116,9 @@
     </div>
   </div>
 
-  <script src="app.js?v=18"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+  <script src="app.js?v=20"></script>
 </body>
 </html>

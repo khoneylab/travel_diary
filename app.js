@@ -1,3 +1,123 @@
+/* ===================== 로그인 & 클라우드 동기화 (Firebase) =====================
+   기기마다 따로였던 localStorage 데이터를, 로그인한 계정 기준으로 Firestore에
+   동기화한다. 텍스트 데이터(여행지 정보/일정/예산 등)만 동기화하고, 사진·BGM
+   같은 파일은 지금은 기기별 IndexedDB에만 남는다.
+   save()가 스크립트 시작부에서 곧바로 한 번 호출되므로, save()가 참조하는
+   scheduleCloudPush/currentUser는 반드시 그보다 앞서 선언되어야 한다. */
+const firebaseConfig = {
+  apiKey: "AIzaSyBvkNOKT19yF3tAYsTJAHv1q2MdNOsXG7c",
+  authDomain: "traveler-db6e4.firebaseapp.com",
+  projectId: "traveler-db6e4",
+  storageBucket: "traveler-db6e4.firebasestorage.app",
+  messagingSenderId: "753694849941",
+  appId: "1:753694849941:web:c0a86326cf27ebee53549c"
+};
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db = firebase.firestore();
+
+let currentUser = null;
+let cloudPushTimer = null;
+
+function userDocRef() {
+  return db.collection('travelDiaries').doc(currentUser.uid);
+}
+
+function mergeCloudState(local, cloud) {
+  if (!cloud || !Array.isArray(cloud.destinations)) return local;
+  if (!local || !Array.isArray(local.destinations)) return cloud;
+  const cloudIds = new Set(cloud.destinations.map(d => d.id));
+  const localOnly = local.destinations.filter(d => !cloudIds.has(d.id));
+  return { ...cloud, destinations: [...cloud.destinations, ...localOnly] };
+}
+
+function scheduleCloudPush() {
+  if (!currentUser) return;
+  clearTimeout(cloudPushTimer);
+  cloudPushTimer = setTimeout(() => {
+    userDocRef().set(state).catch(err => console.error('클라우드 저장 실패', err));
+  }, 900);
+}
+
+async function pullAndMergeCloud() {
+  const snap = await userDocRef().get();
+  if (snap.exists) {
+    state = mergeCloudState(state, snap.data());
+  }
+  normalizeState();
+  migrateColors();
+  save(true);
+  await userDocRef().set(state);
+}
+
+function showApp(signedIn) {
+  document.querySelectorAll('.site-nav, #app, .site-footer').forEach(el => el.classList.toggle('hidden', !signedIn));
+  document.getElementById('authScreen').classList.toggle('hidden', signedIn);
+  document.getElementById('logoutBtn').classList.toggle('hidden', !signedIn);
+}
+
+auth.onAuthStateChanged(async (user) => {
+  currentUser = user;
+  if (user) {
+    showApp(true);
+    try {
+      await user.getIdToken(true);
+      await pullAndMergeCloud();
+    } catch (e) {
+      console.error('클라우드 동기화 실패', e);
+    }
+    render();
+  } else {
+    showApp(false);
+  }
+});
+
+document.getElementById('logoutBtn').addEventListener('click', () => auth.signOut());
+
+let authMode = 'login';
+const authForm = document.getElementById('authForm');
+const authToggleBtn = document.getElementById('authToggleMode');
+const authErrorEl = document.getElementById('authError');
+const authSubmitBtn = document.getElementById('authSubmitBtn');
+
+function authErrorMessage(err) {
+  const map = {
+    'auth/invalid-email': '이메일 형식이 올바르지 않아요.',
+    'auth/user-not-found': '가입되지 않은 이메일이에요.',
+    'auth/wrong-password': '비밀번호가 틀렸어요.',
+    'auth/email-already-in-use': '이미 가입된 이메일이에요. 로그인해주세요.',
+    'auth/weak-password': '비밀번호는 6자 이상이어야 해요.',
+    'auth/invalid-credential': '이메일 또는 비밀번호가 올바르지 않아요.'
+  };
+  return map[err.code] || ('문제가 발생했어요: ' + err.message);
+}
+
+authToggleBtn.addEventListener('click', () => {
+  authMode = authMode === 'login' ? 'signup' : 'login';
+  authSubmitBtn.textContent = authMode === 'login' ? '로그인' : '계정 만들기';
+  authToggleBtn.textContent = authMode === 'login' ? '처음이신가요? 계정 만들기' : '이미 계정이 있으신가요? 로그인';
+  authErrorEl.textContent = '';
+});
+
+authForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const email = document.getElementById('auth-email').value.trim();
+  const password = document.getElementById('auth-password').value;
+  authErrorEl.textContent = '';
+  authSubmitBtn.disabled = true;
+  try {
+    if (authMode === 'login') {
+      await auth.signInWithEmailAndPassword(email, password);
+    } else {
+      await auth.createUserWithEmailAndPassword(email, password);
+    }
+  } catch (err) {
+    authErrorEl.textContent = authErrorMessage(err);
+  } finally {
+    authSubmitBtn.disabled = false;
+  }
+});
+
 /* ===================== 상태 & 저장 ===================== */
 const STORAGE_KEY = 'travelDiaryData_v1';
 const PACKING_TEMPLATE = ['의류', '전자기기', '세면도구/화장품', '서류/기타'];
@@ -26,6 +146,7 @@ function load() {
 let toastTimer = null;
 function save(silent) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  scheduleCloudPush();
   if (!silent) showToast('💾 저장됨');
 }
 

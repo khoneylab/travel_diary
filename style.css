@@ -15,6 +15,7 @@
 }
 
 * { box-sizing: border-box; }
+.hidden { display: none !important; }
 
 body {
   margin: 0;
@@ -136,6 +137,59 @@ h1, h2, h3, .brand, .tab-btn, .btn-primary, .btn-secondary, .day-title {
 .nav-links .crumb-current { color: var(--accent); font-weight: bold; }
 .nav-links a { color: var(--ink-soft); text-decoration: none; }
 .nav-links a:hover { color: var(--accent); }
+
+.logout-btn {
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-size: 1.1rem;
+  color: var(--ink-soft);
+  padding: 4px;
+}
+.logout-btn:hover { color: var(--danger); }
+
+.auth-screen {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  z-index: 30;
+}
+.auth-box {
+  background: rgba(255,255,255,0.9);
+  backdrop-filter: blur(8px);
+  border-radius: var(--radius);
+  padding: 32px 28px;
+  width: 360px;
+  max-width: 100%;
+  box-shadow: var(--shadow);
+  text-align: center;
+}
+.auth-box h2 { margin: 0 0 6px; font-size: 1.4rem; }
+.auth-sub { color: var(--ink-soft); font-size: 0.85rem; margin: 0 0 20px; }
+.auth-box form { display: flex; flex-direction: column; gap: 12px; text-align: left; }
+.auth-box label { display: flex; flex-direction: column; gap: 4px; font-size: 0.85rem; color: var(--ink-soft); }
+.auth-box input {
+  padding: 9px 12px;
+  border: 1px solid var(--paper-line);
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 0.95rem;
+}
+.auth-error { color: var(--danger); font-size: 0.8rem; margin: 0; min-height: 1em; }
+.auth-toggle {
+  display: block;
+  width: 100%;
+  margin-top: 16px;
+  border: none;
+  background: none;
+  color: var(--accent);
+  font-size: 0.82rem;
+  cursor: pointer;
+  text-decoration: underline;
+}
 
 .site-footer {
   text-align: center;
