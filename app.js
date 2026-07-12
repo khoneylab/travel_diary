@@ -1187,6 +1187,21 @@ function renderNoDaysHint() {
   return `<p class="empty-hint">여행지의 시작일 · 종료일을 설정하면 Day별로 자동으로 나뉘어요.<br>상단 ✎ 버튼으로 날짜를 입력해보세요.</p>`;
 }
 
+function updateBudgetTotals(d) {
+  const sym = currencySymbol(d);
+  let plannedTotal = 0, actualTotal = 0;
+  d.budget.forEach(cat => cat.items.forEach(it => {
+    plannedTotal += Number(it.planned) || 0;
+    actualTotal += Number(it.actual) || 0;
+  }));
+  const pEl = document.getElementById('budgetTotalPlanned');
+  const aEl = document.getElementById('budgetTotalActual');
+  const dfEl = document.getElementById('budgetTotalDiff');
+  if (pEl) pEl.textContent = sym + fmtMoney(plannedTotal);
+  if (aEl) aEl.textContent = sym + fmtMoney(actualTotal);
+  if (dfEl) dfEl.textContent = sym + fmtMoney(plannedTotal - actualTotal);
+}
+
 function renderBudget(d) {
   let plannedTotal = 0, actualTotal = 0;
   const sym = currencySymbol(d);
@@ -1198,8 +1213,8 @@ function renderBudget(d) {
       <tr>
         <td></td>
         <td><input type="text" value="${escapeHtml(it.name)}" data-budget="${d.id}|${cat.id}|${it.id}|name"></td>
-        <td><input class="num-input" type="number" value="${it.planned}" data-budget="${d.id}|${cat.id}|${it.id}|planned" placeholder="0"></td>
-        <td><input class="num-input" type="number" value="${it.actual}" data-budget="${d.id}|${cat.id}|${it.id}|actual" placeholder="0"></td>
+        <td><input class="num-input" type="text" inputmode="numeric" value="${it.planned ? fmtMoney(it.planned) : ''}" data-budget-amount="${d.id}|${cat.id}|${it.id}|planned" placeholder="0"></td>
+        <td><input class="num-input" type="text" inputmode="numeric" value="${it.actual ? fmtMoney(it.actual) : ''}" data-budget-amount="${d.id}|${cat.id}|${it.id}|actual" placeholder="0"></td>
         <td><button class="row-del" data-del-budget="${d.id}|${cat.id}|${it.id}">✕</button></td>
       </tr>`;
     }).join('');
@@ -1220,9 +1235,9 @@ function renderBudget(d) {
 
   return `
     <div class="budget-summary">
-      <div class="stat-box total"><div class="stat-num">${sym}${fmtMoney(plannedTotal)}</div><div class="stat-label">예상 총액</div></div>
-      <div class="stat-box"><div class="stat-num">${sym}${fmtMoney(actualTotal)}</div><div class="stat-label">실제 지출</div></div>
-      <div class="stat-box"><div class="stat-num">${sym}${fmtMoney(plannedTotal - actualTotal)}</div><div class="stat-label">차액</div></div>
+      <div class="stat-box total"><div class="stat-num"><span id="budgetTotalPlanned">${sym}${fmtMoney(plannedTotal)}</span></div><div class="stat-label">예상 총액</div></div>
+      <div class="stat-box"><div class="stat-num"><span id="budgetTotalActual">${sym}${fmtMoney(actualTotal)}</span></div><div class="stat-label">실제 지출</div></div>
+      <div class="stat-box"><div class="stat-num"><span id="budgetTotalDiff">${sym}${fmtMoney(plannedTotal - actualTotal)}</span></div><div class="stat-label">차액</div></div>
     </div>
     <table class="budget-table">
       <thead><tr><th></th><th>항목</th><th>예상 (${sym})</th><th>실제 (${sym})</th><th></th></tr></thead>
@@ -1537,7 +1552,25 @@ function bindEvents() {
       const it = findDest(dId).budget.find(c => c.id === cId).items.find(i => i.id === iId);
       it[field] = el.value;
       save();
-      if (field === 'planned' || field === 'actual') render();
+    });
+  });
+  app.querySelectorAll('[data-budget-amount]').forEach(el => {
+    el.addEventListener('focus', () => {
+      el.value = el.value.replace(/[^0-9]/g, ''); // 편집 중엔 콤마 없이 숫자만 보여줌
+    });
+    el.addEventListener('input', () => {
+      const digits = el.value.replace(/[^0-9]/g, '');
+      if (digits !== el.value) el.value = digits;
+      const [dId, cId, iId, field] = el.dataset.budgetAmount.split('|');
+      const it = findDest(dId).budget.find(c => c.id === cId).items.find(i => i.id === iId);
+      it[field] = digits;
+      save();
+      updateBudgetTotals(findDest(dId)); // 입력칸은 그대로 두고 합계만 갱신(포커스 유지)
+    });
+    el.addEventListener('blur', () => {
+      const [dId, cId, iId, field] = el.dataset.budgetAmount.split('|');
+      const it = findDest(dId).budget.find(c => c.id === cId).items.find(i => i.id === iId);
+      el.value = it[field] ? fmtMoney(it[field]) : '';
     });
   });
 }
