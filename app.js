@@ -46,33 +46,46 @@ function generateSyncCode() {
   return code;
 }
 
-// 3-way 병합: "마지막으로 동기화됐던 시점에 어떤 여행지들이 있었는지"를 기준점(base)으로
-// 두고, 로컬/클라우드 각각에서 그 기준점과 달라진 부분(추가/삭제)을 정확히 구분해서 합친다.
-// base에 없던 새 항목은 추가, base에 있었는데 한쪽에서 없어졌으면 삭제로 인식한다.
-// (단순히 "로컬에 없으면 추가"만 하면, 삭제한 항목이 다시 살아나는 문제가 생긴다.)
-const LAST_SYNC_IDS_KEY = 'travelDiaryLastSyncIds';
+// 3-way 병합: "마지막으로 동기화됐던 시점에 여행지들이 어떤 내용이었는지"를 기준점(base)
+// 스냅샷으로 통째로 저장해두고, 로컬/클라우드 각각을 그 기준점과 비교해서 무엇이 추가/삭제/
+// 수정됐는지 판단한다. 단순히 id 존재 여부만 보면 "여행지는 있는데 그 안의 일정·메모 같은
+// 내용만 바뀐" 경우를 구분할 수 없어서, 한쪽이 늘 다른 쪽 내용을 덮어써버리는 문제가 생긴다.
+const LAST_SYNC_SNAPSHOT_KEY = 'travelDiaryLastSyncSnapshot';
 
-function getLastSyncIds() {
-  try { return new Set(JSON.parse(localStorage.getItem(LAST_SYNC_IDS_KEY) || '[]')); }
-  catch (e) { return new Set(); }
+function getLastSyncSnapshot() {
+  try { return JSON.parse(localStorage.getItem(LAST_SYNC_SNAPSHOT_KEY) || '[]'); }
+  catch (e) { return []; }
 }
 
-function setLastSyncIds(destinations) {
-  localStorage.setItem(LAST_SYNC_IDS_KEY, JSON.stringify(destinations.map(d => d.id)));
+function setLastSyncSnapshot(destinations) {
+  localStorage.setItem(LAST_SYNC_SNAPSHOT_KEY, JSON.stringify(destinations));
 }
 
-function threeWayMergeDestinations(localList, cloudList, baseIds) {
+function threeWayMergeDestinations(localList, cloudList, baseList) {
   const localMap = new Map(localList.map(d => [d.id, d]));
   const cloudMap = new Map(cloudList.map(d => [d.id, d]));
-  const allIds = new Set([...localMap.keys(), ...cloudMap.keys(), ...baseIds]);
+  const baseMap = new Map(baseList.map(d => [d.id, d]));
+  const allIds = new Set([...localMap.keys(), ...cloudMap.keys(), ...baseMap.keys()]);
   const result = [];
   allIds.forEach(id => {
-    const inBase = baseIds.has(id);
+    const inBase = baseMap.has(id);
     const inLocal = localMap.has(id);
     const inCloud = cloudMap.has(id);
     if (inBase && !inLocal) return; // 이 기기에서 삭제함 -> 제외
     if (inBase && !inCloud) return; // 다른 기기에서 삭제함 -> 제외
-    result.push(inLocal ? localMap.get(id) : cloudMap.get(id));
+    if (!inLocal) { result.push(cloudMap.get(id)); return; } // 다른 기기가 새로 추가함
+    if (!inCloud) { result.push(localMap.get(id)); return; } // 이 기기가 새로 추가함
+
+    // 둘 다 가지고 있는 여행지 -> 내용을 비교해서 실제로 바뀐 쪽을 채택한다.
+    const localItem = localMap.get(id);
+    const cloudItem = cloudMap.get(id);
+    const localStr = JSON.stringify(localItem);
+    const cloudStr = JSON.stringify(cloudItem);
+    if (localStr === cloudStr) { result.push(localItem); return; }
+    const baseStr = inBase ? JSON.stringify(baseMap.get(id)) : null;
+    if (baseStr !== null && localStr === baseStr) { result.push(cloudItem); return; } // 이 기기는 안 바꿈 -> 상대 수정본 채택
+    if (baseStr !== null && cloudStr === baseStr) { result.push(localItem); return; } // 상대는 안 바꿈 -> 이 기기 수정본 채택
+    result.push(localItem); // 양쪽 다 바뀐 드문 충돌 -> 일단 이 기기 것 우선
   });
   return result;
 }
@@ -80,8 +93,8 @@ function threeWayMergeDestinations(localList, cloudList, baseIds) {
 function mergeCloudState(local, cloud) {
   const cloudDestinations = cloud && Array.isArray(cloud.destinations) ? cloud.destinations : [];
   const localDestinations = local && Array.isArray(local.destinations) ? local.destinations : [];
-  const baseIds = getLastSyncIds();
-  const destinations = threeWayMergeDestinations(localDestinations, cloudDestinations, baseIds);
+  const baseDestinations = getLastSyncSnapshot();
+  const destinations = threeWayMergeDestinations(localDestinations, cloudDestinations, baseDestinations);
   const base = cloud && typeof cloud === 'object' ? cloud : (local || {});
   return { ...base, destinations };
 }
@@ -104,7 +117,7 @@ async function mergeAndPushToCloud() {
   normalizeState();
   migrateColors();
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-  setLastSyncIds(state.destinations);
+  setLastSyncSnapshot(state.destinations);
   await userDocRef().set(state);
   return changed;
 }
