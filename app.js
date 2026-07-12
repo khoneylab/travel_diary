@@ -65,7 +65,10 @@ function threeWayMergeDestinations(localList, cloudList, baseList) {
   const localMap = new Map(localList.map(d => [d.id, d]));
   const cloudMap = new Map(cloudList.map(d => [d.id, d]));
   const baseMap = new Map(baseList.map(d => [d.id, d]));
-  const allIds = new Set([...localMap.keys(), ...cloudMap.keys(), ...baseMap.keys()]);
+  // 순서를 local 배열 순서 기준으로 고정한다(그 다음 cloud에만 있는 새 항목을 뒤에 붙임).
+  // 그렇지 않으면 실제 내용은 하나도 안 바뀌었는데 배열 순서만 달라져서
+  // "바뀐 것"으로 잘못 인식되어 불필요하게 화면이 다시 그려질 수 있다.
+  const allIds = [...localMap.keys(), ...cloudMap.keys(), ...baseMap.keys()].filter((id, i, arr) => arr.indexOf(id) === i);
   const result = [];
   allIds.forEach(id => {
     const inBase = baseMap.has(id);
@@ -127,9 +130,11 @@ async function flushCloudPush() {
   if (!syncCode || !cloudSyncReady) return;
   setSyncStatus('☁️ 저장 중...', 'busy');
   try {
-    const changed = await mergeAndPushToCloud();
+    // 배경 자동저장에서는 화면을 다시 그리지 않는다(render()는 입력 중인 칸의
+    // 포커스/커서 위치를 날려버려서 타자 입력이 자꾸 끊기게 만든다). 다른 기기의
+    // 변경사항은 이 탭으로 돌아오거나 새로고침할 때 자연스럽게 반영된다.
+    await mergeAndPushToCloud();
     setSyncStatus('☁️ ' + fmtClock(new Date()) + ' 저장됨', 'ok');
-    if (changed) render();
   } catch (err) {
     console.error('클라우드 저장 실패', err);
     setSyncStatus('⚠️ 저장 실패', 'error');
@@ -140,7 +145,12 @@ async function flushCloudPush() {
 // 즉시 클라우드로 내보낸다. 그렇지 않으면 수정 직후 바로 닫을 경우 그 변경이
 // 클라우드에 반영되지 못한 채 사라질 수 있다.
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'hidden') flushCloudPush();
+  if (document.visibilityState === 'hidden') {
+    flushCloudPush();
+  } else if (document.visibilityState === 'visible' && syncCode && cloudSyncReady) {
+    // 다른 화면을 보다가 이 탭으로 돌아왔을 때, 그 사이 다른 기기가 바꿔둔 내용을 받아온다.
+    pullAndMergeCloud().then(render).catch(err => console.error('클라우드 동기화 실패', err));
+  }
 });
 window.addEventListener('pagehide', flushCloudPush);
 
@@ -1074,6 +1084,7 @@ function renderLinks(d) {
         <input type="url" value="${escapeHtml(l.url || '')}" placeholder="https://..." data-link="${d.id}|${l.id}|url">
         ${l.url && isSafeHttpUrl(l.url) ? `<a href="${escapeHtml(l.url)}" target="_blank" rel="noopener" title="열기">↗</a>` : ''}
       </div>
+      <input type="text" class="link-memo" value="${escapeHtml(l.memo || '')}" placeholder="📝 메모 (예: 예약번호, 아이디 등)" data-link="${d.id}|${l.id}|memo">
     </div>
   `).join('') || '<p class="empty-hint">아직 등록된 링크가 없어요</p>';
 
@@ -1390,7 +1401,7 @@ function bindEvents() {
       const title = inputs[0].value.trim();
       const url = inputs[1].value.trim();
       if (!title) return;
-      findDest(dId).links.push({ id: uid(), title, url });
+      findDest(dId).links.push({ id: uid(), title, url, memo: '' });
       save(); render();
     });
   });
