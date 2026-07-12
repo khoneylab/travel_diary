@@ -46,12 +46,44 @@ function generateSyncCode() {
   return code;
 }
 
+// 3-way 병합: "마지막으로 동기화됐던 시점에 어떤 여행지들이 있었는지"를 기준점(base)으로
+// 두고, 로컬/클라우드 각각에서 그 기준점과 달라진 부분(추가/삭제)을 정확히 구분해서 합친다.
+// base에 없던 새 항목은 추가, base에 있었는데 한쪽에서 없어졌으면 삭제로 인식한다.
+// (단순히 "로컬에 없으면 추가"만 하면, 삭제한 항목이 다시 살아나는 문제가 생긴다.)
+const LAST_SYNC_IDS_KEY = 'travelDiaryLastSyncIds';
+
+function getLastSyncIds() {
+  try { return new Set(JSON.parse(localStorage.getItem(LAST_SYNC_IDS_KEY) || '[]')); }
+  catch (e) { return new Set(); }
+}
+
+function setLastSyncIds(destinations) {
+  localStorage.setItem(LAST_SYNC_IDS_KEY, JSON.stringify(destinations.map(d => d.id)));
+}
+
+function threeWayMergeDestinations(localList, cloudList, baseIds) {
+  const localMap = new Map(localList.map(d => [d.id, d]));
+  const cloudMap = new Map(cloudList.map(d => [d.id, d]));
+  const allIds = new Set([...localMap.keys(), ...cloudMap.keys(), ...baseIds]);
+  const result = [];
+  allIds.forEach(id => {
+    const inBase = baseIds.has(id);
+    const inLocal = localMap.has(id);
+    const inCloud = cloudMap.has(id);
+    if (inBase && !inLocal) return; // 이 기기에서 삭제함 -> 제외
+    if (inBase && !inCloud) return; // 다른 기기에서 삭제함 -> 제외
+    result.push(inLocal ? localMap.get(id) : cloudMap.get(id));
+  });
+  return result;
+}
+
 function mergeCloudState(local, cloud) {
-  if (!cloud || !Array.isArray(cloud.destinations)) return local;
-  if (!local || !Array.isArray(local.destinations)) return cloud;
-  const cloudIds = new Set(cloud.destinations.map(d => d.id));
-  const localOnly = local.destinations.filter(d => !cloudIds.has(d.id));
-  return { ...cloud, destinations: [...cloud.destinations, ...localOnly] };
+  const cloudDestinations = cloud && Array.isArray(cloud.destinations) ? cloud.destinations : [];
+  const localDestinations = local && Array.isArray(local.destinations) ? local.destinations : [];
+  const baseIds = getLastSyncIds();
+  const destinations = threeWayMergeDestinations(localDestinations, cloudDestinations, baseIds);
+  const base = cloud && typeof cloud === 'object' ? cloud : (local || {});
+  return { ...base, destinations };
 }
 
 function scheduleCloudPush() {
@@ -72,6 +104,7 @@ async function mergeAndPushToCloud() {
   normalizeState();
   migrateColors();
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  setLastSyncIds(state.destinations);
   await userDocRef().set(state);
   return changed;
 }
