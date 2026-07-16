@@ -88,9 +88,61 @@ function threeWayMergeDestinations(localList, cloudList, baseList) {
     const baseStr = inBase ? JSON.stringify(baseMap.get(id)) : null;
     if (baseStr !== null && localStr === baseStr) { result.push(cloudItem); return; } // 이 기기는 안 바꿈 -> 상대 수정본 채택
     if (baseStr !== null && cloudStr === baseStr) { result.push(localItem); return; } // 상대는 안 바꿈 -> 이 기기 수정본 채택
-    result.push(localItem); // 양쪽 다 바뀐 드문 충돌 -> 일단 이 기기 것 우선
+    // 기준점이 없거나(예: 새 기능 배포 직후라 아직 기준점이 없는 첫 동기화) 양쪽 다 바뀐
+    // 드문 충돌 상황 -> 어느 한쪽을 통째로 버리지 않고 내용을 최대한 합친다.
+    result.push(safeUnionMergeDestination(localItem, cloudItem));
   });
   return result;
+}
+
+// 어느 쪽이 "진짜 최신"인지 판단할 기준이 없을 때 쓰는 안전망. 통째로 한쪽만
+// 고르면 그쪽에 없는 내용(예: 다른 기기에서만 적은 일정)이 통째로 사라지므로,
+// 목록/맵 형태의 하위 항목들은 양쪽을 id 기준으로 합쳐서 아무것도 잃지 않게 한다.
+function unionArrayById(a, b) {
+  const map = new Map();
+  (b || []).forEach(x => x && x.id != null && map.set(x.id, x));
+  (a || []).forEach(x => x && x.id != null && map.set(x.id, x)); // a(로컬) 우선
+  return Array.from(map.values());
+}
+
+function unionCategoriesWithItems(a, b) {
+  const bMap = new Map((b || []).map(c => [c.id, c]));
+  const merged = (a || []).map(cat => {
+    const bCat = bMap.get(cat.id);
+    bMap.delete(cat.id);
+    return bCat ? { ...cat, items: unionArrayById(cat.items, bCat.items) } : cat;
+  });
+  return merged.concat(Array.from(bMap.values()));
+}
+
+function unionDayMapOfArrays(a, b) {
+  const result = {};
+  new Set([...Object.keys(a || {}), ...Object.keys(b || {})]).forEach(dayId => {
+    result[dayId] = unionArrayById((a || {})[dayId], (b || {})[dayId]);
+  });
+  return result;
+}
+
+function safeUnionMergeDestination(localItem, cloudItem) {
+  const merged = { ...cloudItem, ...localItem };
+  merged.packing = unionCategoriesWithItems(localItem.packing, cloudItem.packing);
+  merged.budget = unionCategoriesWithItems(localItem.budget, cloudItem.budget);
+  merged.itinerary = unionDayMapOfArrays(localItem.itinerary, cloudItem.itinerary);
+  merged.outfits = { ...(cloudItem.outfits || {}), ...(localItem.outfits || {}) };
+  merged.lodging = unionArrayById(localItem.lodging, cloudItem.lodging);
+  merged.links = unionArrayById(localItem.links, cloudItem.links);
+  const journalDayIds = new Set([...Object.keys(localItem.journal || {}), ...Object.keys(cloudItem.journal || {})]);
+  merged.journal = {};
+  journalDayIds.forEach(dayId => {
+    const lj = (localItem.journal || {})[dayId] || {};
+    const cj = (cloudItem.journal || {})[dayId] || {};
+    merged.journal[dayId] = {
+      text: lj.text || cj.text || '',
+      photos: unionArrayById(lj.photos, cj.photos)
+    };
+  });
+  merged.days = (localItem.days && localItem.days.length) ? localItem.days : cloudItem.days;
+  return merged;
 }
 
 function mergeCloudState(local, cloud) {
@@ -122,7 +174,30 @@ async function mergeAndPushToCloud() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   setLastSyncSnapshot(state.destinations);
   await userDocRef().set(state);
+  saveHistorySnapshot(state); // 실패해도 무시되는 부가 안전망(백업 기록)
   return changed;
+}
+
+// 저장할 때마다 그 시점 스냅샷을 따로 남겨둔다. 병합 로직에 무슨 문제가 있어도
+// 이전 시점으로 되돌릴 수 있는 마지막 안전망이다. 실패해도 본 저장에는 영향 없다.
+function saveHistorySnapshot(snapshotState) {
+  const ts = String(Date.now());
+  userDocRef().collection('history').doc(ts).set(snapshotState)
+    .then(() => pruneHistory())
+    .catch(err => console.error('버전 기록 저장 실패(무시됨)', err));
+}
+
+async function pruneHistory() {
+  try {
+    const snaps = await userDocRef().collection('history').orderBy('__name__', 'desc').get();
+    const extra = snaps.docs.slice(30); // 최근 30개만 남김
+    await Promise.all(extra.map(docSnap => docSnap.ref.delete()));
+  } catch (e) { /* 정리 실패는 무시 */ }
+}
+
+async function listHistorySnapshots() {
+  const snaps = await userDocRef().collection('history').orderBy('__name__', 'desc').limit(30).get();
+  return snaps.docs.map(docSnap => ({ id: docSnap.id, data: docSnap.data() }));
 }
 
 async function flushCloudPush() {
@@ -239,6 +314,70 @@ document.getElementById('codeResetBtn').addEventListener('click', () => {
   localStorage.removeItem(SYNC_CODE_KEY);
   location.reload();
 });
+
+/* ===================== 이전 버전(자동 백업) 보기 & 복구 ===================== */
+const historyModal = document.getElementById('historyModal');
+const historyList = document.getElementById('historyList');
+
+document.getElementById('historyOpenBtn').addEventListener('click', async () => {
+  codeInfoBox.classList.add('hidden');
+  historyModal.classList.remove('hidden');
+  historyList.innerHTML = '<p class="empty-hint">불러오는 중...</p>';
+  try {
+    const items = await listHistorySnapshots();
+    if (!items.length) {
+      historyList.innerHTML = '<p class="empty-hint">아직 기록된 이전 버전이 없어요.</p>';
+      return;
+    }
+    historyList.innerHTML = items.map((item, i) => {
+      const when = new Date(Number(item.id)).toLocaleString('ko-KR');
+      const destCount = Array.isArray(item.data.destinations) ? item.data.destinations.length : 0;
+      return `
+        <div class="history-row">
+          <div class="history-row-info">
+            <div class="history-row-when">${when}</div>
+            <div class="history-row-sub">여행지 ${destCount}곳</div>
+          </div>
+          <button type="button" class="btn-secondary" data-restore-history="${i}">이 시점으로 복구</button>
+        </div>`;
+    }).join('');
+    historyList.querySelectorAll('[data-restore-history]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const item = items[Number(btn.dataset.restoreHistory)];
+        const when = new Date(Number(item.id)).toLocaleString('ko-KR');
+        if (!confirm(`${when} 시점의 내용을 지금 데이터에 합칠까요?\n(지금 있는 내용은 지워지지 않고, 그 시점에만 있던 내용이 추가돼요)`)) return;
+        await restoreFromHistory(item.data);
+        historyModal.classList.add('hidden');
+        showToast('✅ 이전 버전을 복구했어요');
+      });
+    });
+  } catch (err) {
+    console.error(err);
+    historyList.innerHTML = '<p class="empty-hint">불러오지 못했어요. 잠시 후 다시 시도해주세요.</p>';
+  }
+});
+
+document.getElementById('historyCloseBtn').addEventListener('click', () => {
+  historyModal.classList.add('hidden');
+});
+historyModal.addEventListener('click', (e) => { if (e.target === historyModal) historyModal.classList.add('hidden'); });
+
+async function restoreFromHistory(snapshotState) {
+  if (!snapshotState || !Array.isArray(snapshotState.destinations)) return;
+  const seen = new Set();
+  const merged = state.destinations.map(d => {
+    seen.add(d.id);
+    const snapDest = snapshotState.destinations.find(sd => sd.id === d.id);
+    return snapDest ? safeUnionMergeDestination(d, snapDest) : d;
+  });
+  snapshotState.destinations.forEach(sd => {
+    if (!seen.has(sd.id)) merged.push(sd);
+  });
+  state.destinations = merged;
+  normalizeState();
+  save();
+  render();
+}
 
 /* ===================== 상태 & 저장 ===================== */
 const STORAGE_KEY = 'travelDiaryData_v1';

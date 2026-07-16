@@ -7,7 +7,7 @@
 <title>여행 다이어리</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Gowun+Dodum&family=Gowun+Batang:wght@400;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=23">
+<link rel="stylesheet" href="style.css?v=24">
 </head>
 <body>
   <!-- 배경 장식: 비눗방울 & 하트 & 반짝임 (장식용, 클릭 불가) -->
@@ -47,7 +47,20 @@
     <div class="code-display" id="codeInfoValue">-</div>
     <button type="button" id="codeCopyBtn" class="btn-secondary">📋 복사</button>
     <p class="code-info-hint">다른 기기에서 이 코드를 입력하면 데이터가 연결돼요.</p>
+    <button type="button" id="historyOpenBtn" class="auth-toggle">🕐 이전 버전 보기/복구</button>
     <button type="button" id="codeResetBtn" class="auth-toggle">다른 코드로 새로 시작</button>
+  </div>
+
+  <!-- 이전 버전(자동 백업) 목록 -->
+  <div id="historyModal" class="modal-overlay hidden">
+    <div class="modal">
+      <h3>🕐 이전 버전 보기</h3>
+      <p class="auth-sub">저장할 때마다 자동으로 기록된 이전 시점이에요. 원하는 시점을 골라 복구하면, 지금 데이터는 지우지 않고 그 시점 내용을 안전하게 합쳐줘요.</p>
+      <div id="historyList" class="history-list"><p class="empty-hint">불러오는 중...</p></div>
+      <div class="modal-actions">
+        <button type="button" class="btn-secondary" id="historyCloseBtn">닫기</button>
+      </div>
+    </div>
   </div>
 
   <!-- 동기화 코드 설정 화면: 코드가 없으면 이 화면만 보이고 나머지는 가려짐 -->
@@ -136,6 +149,6 @@
 
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
-  <script src="app.js?v=31"></script>
+  <script src="app.js?v=32"></script>
 </body>
 </html>

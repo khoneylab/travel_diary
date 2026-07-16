@@ -249,6 +249,27 @@ h1, h2, h3, .brand, .tab-btn, .btn-primary, .btn-secondary, .day-title {
   max-width: calc(100vw - 32px);
 }
 
+.history-list {
+  max-height: 320px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 10px 0;
+}
+.history-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  background: var(--paper);
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+.history-row-when { font-size: 0.85rem; color: var(--ink); }
+.history-row-sub { font-size: 0.75rem; color: var(--ink-soft); }
+.history-row .btn-secondary { font-size: 0.8rem; padding: 7px 12px; white-space: nowrap; }
+
 .site-footer {
   text-align: center;
   padding: 26px 20px 40px;
