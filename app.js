@@ -187,17 +187,23 @@ function saveHistorySnapshot(snapshotState) {
     .catch(err => console.error('버전 기록 저장 실패(무시됨)', err));
 }
 
+// orderBy('__name__')는 Firestore 색인 생성이 별도로 필요해서, 대신 그냥 다 받아온 뒤
+// 문서 id(타임스탬프 문자열)를 기준으로 여기서 직접 정렬한다.
 async function pruneHistory() {
   try {
-    const snaps = await userDocRef().collection('history').orderBy('__name__', 'desc').get();
-    const extra = snaps.docs.slice(30); // 최근 30개만 남김
+    const snaps = await userDocRef().collection('history').get();
+    const sorted = snaps.docs.sort((a, b) => b.id.localeCompare(a.id));
+    const extra = sorted.slice(30); // 최근 30개만 남김
     await Promise.all(extra.map(docSnap => docSnap.ref.delete()));
   } catch (e) { /* 정리 실패는 무시 */ }
 }
 
 async function listHistorySnapshots() {
-  const snaps = await userDocRef().collection('history').orderBy('__name__', 'desc').limit(30).get();
-  return snaps.docs.map(docSnap => ({ id: docSnap.id, data: docSnap.data() }));
+  const snaps = await userDocRef().collection('history').get();
+  return snaps.docs
+    .sort((a, b) => b.id.localeCompare(a.id))
+    .slice(0, 30)
+    .map(docSnap => ({ id: docSnap.id, data: docSnap.data() }));
 }
 
 async function flushCloudPush() {
